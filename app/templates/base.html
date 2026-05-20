@@ -384,11 +384,16 @@
       }	  
 
       function refreshNavBadges() {
-        fetch("/api/nav-badges", {
+        var badgeUrl = "/api/nav-badges?_ts=" + Date.now();
+
+        fetch(badgeUrl, {
           method: "GET",
           credentials: "same-origin",
+          cache: "no-store",
           headers: {
-            "Accept": "application/json"
+            "Accept": "application/json",
+            "Cache-Control": "no-cache",
+            "Pragma": "no-cache"
           }
         })
           .then(function (response) {
@@ -418,6 +423,10 @@
       document.addEventListener("DOMContentLoaded", function () {
         refreshNavBadges();
         window.setInterval(refreshNavBadges, 15000);
+      });
+
+      window.addEventListener("pageshow", function () {
+        refreshNavBadges();
       });
 
       window.addEventListener("focus", refreshNavBadges);

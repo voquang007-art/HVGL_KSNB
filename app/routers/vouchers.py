@@ -456,17 +456,61 @@ def fetch_full_voucher(voucher_id: int) -> dict:
         "routes": routes,
     }
 
-
 def can_view_voucher(user: dict, voucher) -> bool:
+    if not user or not voucher:
+        return False
+
     if user.get("role_code") == ROLE_ADMIN:
         return True
+
     if voucher["created_by"] == user.get("id"):
         return True
+
     if user.get("role_code") in KSNB_ROLES:
         return True
+
     if user.get("role_code") in BOARD_ROLES and voucher["status"] in ("SUBMITTED_TO_BOARD", "BOARD_VIEWED", "BOARD_SAVED"):
         return True
+
     return False
+
+
+def mark_admin_voucher_seen(voucher_id: int, user: dict) -> None:
+    if not user or user.get("role_code") != ROLE_ADMIN:
+        return
+
+    with get_conn() as conn:
+        voucher = conn.execute(
+            "SELECT status FROM vouchers WHERE id = ?",
+            (voucher_id,),
+        ).fetchone()
+
+        if not voucher or voucher["status"] not in ("SUBMITTED_TO_HEAD", "SUBMITTED_TO_BOARD"):
+            return
+
+        existing_seen = conn.execute(
+            """
+            SELECT id
+            FROM voucher_routes
+            WHERE voucher_id = ?
+              AND action = 'ADMIN_XEM_PHIEU'
+              AND from_user_id = ?
+            LIMIT 1
+            """,
+            (voucher_id, user["id"]),
+        ).fetchone()
+
+        if existing_seen:
+            return
+
+        conn.execute(
+            """
+            INSERT INTO voucher_routes(voucher_id, action, from_user_id, note)
+            VALUES (?, 'ADMIN_XEM_PHIEU', ?, ?)
+            """,
+            (voucher_id, user["id"], "Admin đã mở xem Phiếu kiểm soát."),
+        )
+        conn.commit()
 
 
 def print_context(request: Request, voucher_id: int) -> dict:
@@ -572,12 +616,30 @@ def voucher_list(request: Request):
             params,
         ).fetchall()
 
+    admin_seen_voucher_ids: set[int] = set()
+    if user["role_code"] == ROLE_ADMIN:
+        with get_conn() as conn:
+            seen_rows = conn.execute(
+                """
+                SELECT voucher_id
+                FROM voucher_routes
+                WHERE action = 'ADMIN_XEM_PHIEU'
+                  AND from_user_id = ?
+                """,
+                (user["id"],),
+            ).fetchall()
+        admin_seen_voucher_ids = {int(row["voucher_id"]) for row in seen_rows}
+
     voucher_rows = []
     for row in rows:
         item = dict(row)
         item["is_new_for_current_user"] = False
 
-        if user["role_code"] == ROLE_ADMIN and item["status"] in ("SUBMITTED_TO_HEAD", "SUBMITTED_TO_BOARD"):
+        if (
+            user["role_code"] == ROLE_ADMIN
+            and item["status"] in ("SUBMITTED_TO_HEAD", "SUBMITTED_TO_BOARD")
+            and int(item["id"]) not in admin_seen_voucher_ids
+        ):
             item["is_new_for_current_user"] = True
         elif user["role_code"] in HEAD_ROLES and item["status"] == "SUBMITTED_TO_HEAD" and item["current_handler"] == user["id"]:
             item["is_new_for_current_user"] = True
@@ -1002,6 +1064,9 @@ def voucher_detail(request: Request, voucher_id: int):
     data = print_context(request, voucher_id)
     voucher = data["voucher"]
 
+    if request.state.user.get("role_code") == ROLE_ADMIN:
+        mark_admin_voucher_seen(voucher_id, request.state.user)
+
     if request.state.user.get("role_code") in BOARD_ROLES:
         return RedirectResponse(f"/vouchers/{voucher_id}/print", status_code=303)
 
@@ -1051,17 +1116,17 @@ def voucher_print(request: Request, voucher_id: int):
     data = print_context(request, voucher_id)
     voucher = data["voucher"]
 
+    if user.get("role_code") == ROLE_ADMIN:
+        mark_admin_voucher_seen(voucher_id, user)
+
     if user.get("role_code") in BOARD_ROLES and voucher["status"] == "SUBMITTED_TO_BOARD":
         with get_conn() as conn:
             current_voucher = conn.execute(
-                "SELECT status, current_handler FROM vouchers WHERE id = ?",
+                "SELECT status FROM vouchers WHERE id = ?",
                 (voucher_id,),
             ).fetchone()
 
-            if current_voucher and current_voucher["status"] == "SUBMITTED_TO_BOARD" and (
-                current_voucher["current_handler"] == user["id"]
-                or current_voucher["current_handler"] is None
-            ):
+            if current_voucher and current_voucher["status"] == "SUBMITTED_TO_BOARD":
                 conn.execute(
                     "UPDATE vouchers SET status = 'BOARD_VIEWED', current_handler = NULL WHERE id = ?",
                     (voucher_id,),

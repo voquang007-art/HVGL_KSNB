@@ -62,6 +62,24 @@ def _voucher_badge_count(conn: sqlite3.Connection, user_id: int, role_code: str)
         return 0
 
     if role_code == ROLE_ADMIN:
+        if _table_exists(conn, "voucher_routes"):
+            return _safe_count(
+                conn,
+                """
+                SELECT COUNT(*) AS c
+                FROM vouchers v
+                WHERE v.status IN ('SUBMITTED_TO_HEAD', 'SUBMITTED_TO_BOARD')
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM voucher_routes r
+                      WHERE r.voucher_id = v.id
+                        AND r.action = 'ADMIN_XEM_PHIEU'
+                        AND r.from_user_id = ?
+                  )
+                """,
+                (user_id,),
+            )
+
         return _safe_count(
             conn,
             """
@@ -315,7 +333,12 @@ def nav_badges(request: Request):
             {
                 "ok": False,
                 "badges": {},
-            }
+            },
+            headers={
+                "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+                "Pragma": "no-cache",
+                "Expires": "0",
+            },
         )
 
     user_id = int(_user_value(user, "id", 0) or 0)
@@ -348,5 +371,10 @@ def nav_badges(request: Request):
         {
             "ok": True,
             "badges": badges,
-        }
+        },
+        headers={
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        },
     )
