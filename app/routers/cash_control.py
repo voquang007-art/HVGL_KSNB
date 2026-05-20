@@ -2509,7 +2509,7 @@ def cash_control_voucher_delete(request: Request, voucher_id: int):
         if voucher["created_by"] != user["id"] and user.get("role_code") != "ADMIN":
             return RedirectResponse(f"/cash-control/vouchers/{voucher_id}", status_code=303)
 
-        if voucher["status"] in {"SUBMITTED_TO_BOARD", "BOARD_VIEWED", "BOARD_SAVED"}:
+        if voucher["status"] != "DRAFT":
             return RedirectResponse(f"/cash-control/vouchers/{voucher_id}", status_code=303)
 
         conn.execute(

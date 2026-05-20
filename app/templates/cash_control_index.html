@@ -1370,7 +1370,6 @@
         <td><span class="badge">{{ cash_control_status_labels.get(v.status, v.status) }}</span></td>
         <td>{{ format_vn_sqlite_datetime(v.created_at) }}</td>
         <td>
-        <td>
           {% if v.status == 'DRAFT' and (v.created_by == user.id or user.role_code == 'ADMIN') %}
           <a href="/cash-control?main_tab=voucher&editing_voucher_id={{ v.id }}&his_batch_id={{ v.his_batch_id or '' }}&cashbook_batch_id={{ v.cashbook_batch_id or '' }}&accounting_batch_id={{ v.accounting_batch_id or '' }}">
             Sửa nháp
@@ -1386,9 +1385,9 @@
           {% endif %}
           |
           <a target="_blank" href="/cash-control/vouchers/{{ v.id }}/print">In</a>
-          {% if v.status not in ['SUBMITTED_TO_BOARD', 'BOARD_VIEWED', 'BOARD_SAVED'] and (v.created_by == user.id or user.role_code == 'ADMIN') %}
+          {% if v.status == 'DRAFT' and (v.created_by == user.id or user.role_code == 'ADMIN') %}
           |
-          <form method="post" action="/cash-control/vouchers/{{ v.id }}/delete" style="display:inline;" onsubmit="return confirm('Anh chắc chắn muốn xóa Phiếu kiểm soát này? Thao tác này sẽ xóa Phiếu và các dòng chi tiết đã lưu, không áp dụng cho Phiếu đã trình Hội đồng thành viên.');">
+          <form method="post" action="/cash-control/vouchers/{{ v.id }}/delete" style="display:inline;" onsubmit="return confirm('Anh chắc chắn muốn xóa Phiếu nháp này? Thao tác này sẽ xóa Phiếu và các dòng chi tiết đã lưu.');">
             <button type="submit" class="secondary" style="padding:3px 8px;">Xóa</button>
           </form>
           {% endif %}
