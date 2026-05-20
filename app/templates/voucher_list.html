@@ -138,13 +138,13 @@
         {% else %}
         <a href="/vouchers/{{ v.id }}">Xem</a>
         {% endif %}
-        {% if v.status not in ['SUBMITTED_TO_BOARD','BOARD_VIEWED','BOARD_SAVED'] and (user.role_code == 'ADMIN' or v.created_by == user.id) %}
+        {% if v.status == 'DRAFT' and (user.role_code == 'ADMIN' or v.created_by == user.id) %}
           |
           <a href="/vouchers/{{ v.id }}/edit">Sửa</a>
         {% endif %}
         {% if v.status == 'DRAFT' and (user.role_code == 'ADMIN' or v.created_by == user.id) %}
           |
-          <form method="post" action="/vouchers/{{ v.id }}/delete" style="display:inline;" onsubmit="return confirm('Anh chắc chắn muốn xóa phiếu này? Thao tác này không thể hoàn tác.');">
+          <form method="post" action="/vouchers/{{ v.id }}/delete" style="display:inline;" onsubmit="return confirm('Bạn chắc chắn muốn xóa phiếu này? Thao tác này không thể hoàn tác.');">
             <button type="submit" class="link-button">Xóa</button>
           </form>
         {% endif %}

@@ -135,7 +135,7 @@ def doc_payment_note(doc) -> str:
 def can_edit_voucher_before_board(user: dict, voucher) -> bool:
     if not user or not voucher:
         return False
-    if voucher["status"] in BOARD_LOCKED_STATUSES:
+    if voucher["status"] != "DRAFT":
         return False
     if user.get("role_code") == ROLE_ADMIN:
         return True
