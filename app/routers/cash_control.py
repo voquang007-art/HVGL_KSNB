@@ -211,7 +211,7 @@ def classify_cash_receipt(counterparty_credit_code: Any, description: Any) -> st
     code = str(counterparty_credit_code or "").strip().upper()
     desc = normalize_text(description)
 
-    if code in {"KHACHKCB", "KSKSK", "KLKSK"}:
+    if code in {"KHACHKCB", "KSKSK", "KLKSK", "THAMMY"}:
         return "Thu tiền khám chữa bệnh"
     if code == "QUAYKINH":
         return "Thu tiền Quầy kính"
@@ -1816,7 +1816,7 @@ def build_reconcile_context(
     cashbook_kcb_details = []
     selected_cashbook_batch = cashbook_context.get("selected_cashbook_batch")
     selected_cashbook_batch_id = selected_cashbook_batch["id"] if selected_cashbook_batch else None
-    allowed_cashbook_kcb_codes = {"KHACHKCB", "KLKSK", "QUAYKINH"}
+    allowed_cashbook_kcb_codes = {"KHACHKCB", "KLKSK", "QUAYKINH", "THAMMY"}
 
     if selected_his_batch_id and selected_cashbook_batch_id:
         with get_conn() as conn:
@@ -1828,7 +1828,7 @@ def build_reconcile_context(
                     FROM cash_control_cashbook_entries
                     WHERE batch_id = ?
                       AND doc_type = 'PT'
-                      AND UPPER(COALESCE(credit_code, '')) IN ('KHACHKCB', 'KLKSK', 'QUAYKINH')
+                      AND UPPER(COALESCE(credit_code, '')) IN ('KHACHKCB', 'KLKSK', 'QUAYKINH', 'THAMMY')
                     ORDER BY voucher_date, voucher_no, id
                     """,
                     (selected_cashbook_batch_id,),
