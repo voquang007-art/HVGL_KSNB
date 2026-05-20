@@ -1633,6 +1633,27 @@ def update_cash_control_voucher_basic_record(
     section_v_text = "Nguồn dữ liệu kiểm soát: " + "; ".join(source_note) if source_note else ""
 
     with get_conn() as conn:
+        existing_voucher = conn.execute(
+            """
+            SELECT section_iv_result, section_iv_note, section_v_text, section_vi_text
+            FROM cash_control_vouchers
+            WHERE id = ?
+            """,
+            (voucher_id,),
+        ).fetchone()
+
+        if existing_voucher:
+            existing_section_iv_result = str(existing_voucher["section_iv_result"] or "").strip()
+            existing_section_iv_note = str(existing_voucher["section_iv_note"] or "").strip()
+            existing_section_v_text = str(existing_voucher["section_v_text"] or "").strip()
+
+            if existing_section_iv_result:
+                section_iv_result = existing_section_iv_result
+            if existing_section_iv_note:
+                section_iv_note = existing_section_iv_note
+            if existing_section_v_text and not existing_section_v_text.startswith("Nguồn dữ liệu kiểm soát:"):
+                section_v_text = existing_section_v_text
+
         conn.execute(
             """
             UPDATE cash_control_vouchers
