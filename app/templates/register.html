@@ -1,0 +1,100 @@
+{% extends 'base.html' %}
+{% block content %}
+<style>
+  .password-field-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+
+  .password-field-wrap input {
+    width: 100%;
+    padding-right: 46px;
+    box-sizing: border-box;
+  }
+
+  .password-toggle-btn {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    border: none;
+    background: transparent;
+    color: #075985;
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+    padding: 4px 6px;
+  }
+
+  .password-toggle-btn:hover {
+    color: #0f5fa8;
+  }
+
+  .auth-developer-note {
+    margin-top: 12px;
+    text-align: center;
+    color: #b77900;
+    font-style: italic;
+    font-weight: 700;
+  }
+</style>
+
+<div class="auth-card">
+  <h2>Đăng ký sử dụng</h2>
+  <p class="muted">Tài khoản đăng ký tự động vào đơn vị “Thành viên trưng tập”. Admin gán vị trí sau.</p>
+  {% if error %}<div class="alert">{{ error }}</div>{% endif %}
+  <form method="post" action="/register">
+    <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token or '' }}">
+    <label>Tên đăng nhập</label>
+    <input name="username" required autofocus>
+
+    <label>Họ tên</label>
+    <input name="full_name" required>
+
+    <label>Mật khẩu</label>
+    <div class="password-field-wrap">
+      <input id="registerPassword" name="password" type="password" required>
+      <button class="password-toggle-btn" type="button" data-target="registerPassword" aria-label="Hiển thị mật khẩu" title="Hiển thị mật khẩu">👁</button>
+    </div>
+
+    <label>Nhập lại mật khẩu</label>
+    <div class="password-field-wrap">
+      <input id="registerConfirmPassword" name="confirm_password" type="password" required>
+      <button class="password-toggle-btn" type="button" data-target="registerConfirmPassword" aria-label="Hiển thị mật khẩu" title="Hiển thị mật khẩu">👁</button>
+    </div>
+
+    <button class="primary" type="submit">Đăng ký</button>
+  </form>
+  <p class="muted"><a href="/login">Quay lại đăng nhập</a></p>
+  <div class="auth-developer-note">Ứng dụng được phát triển bởi Võ Như Minh Quang</div>
+</div>
+
+<script>
+  (function () {
+    "use strict";
+
+    document.querySelectorAll(".password-toggle-btn").forEach(function (button) {
+      button.addEventListener("click", function () {
+        var targetId = button.getAttribute("data-target");
+        var input = document.getElementById(targetId);
+        if (!input) {
+          return;
+        }
+
+        if (input.type === "password") {
+          input.type = "text";
+          button.textContent = "🙈";
+          button.setAttribute("aria-label", "Ẩn mật khẩu");
+          button.setAttribute("title", "Ẩn mật khẩu");
+        } else {
+          input.type = "password";
+          button.textContent = "👁";
+          button.setAttribute("aria-label", "Hiển thị mật khẩu");
+          button.setAttribute("title", "Hiển thị mật khẩu");
+        }
+      });
+    });
+  })();
+</script>
+{% endblock %}

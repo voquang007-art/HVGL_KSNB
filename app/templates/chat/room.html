@@ -1,0 +1,1098 @@
+{% extends "base.html" %}
+
+{% block content %}
+<link rel="stylesheet" href="/static/chat/chat.css">
+
+<style>
+.chat-member-multiselect {
+  position: relative;
+}
+
+.chat-member-multiselect-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #fff;
+  font: inherit;
+  color: #0f172a;
+  cursor: pointer;
+}
+
+.chat-member-multiselect-btn:focus {
+  outline: none;
+  border-color: #0f766e;
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, .12);
+}
+
+.chat-member-multiselect-label {
+  flex: 1;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chat-member-multiselect-arrow {
+  font-size: 12px;
+  color: #475569;
+  flex: 0 0 auto;
+}
+
+.chat-member-multiselect-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 999;
+  display: none;
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, .12);
+  padding: 10px;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.chat-member-multiselect.open .chat-member-multiselect-panel {
+  display: block;
+}
+
+.chat-add-member-form {
+  display: grid;
+  gap: 10px;
+}
+
+.chat-members-add-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  background: #fcfdff;
+  padding-top: 8px;
+  margin-top: 2px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.chat-members-add-submit {
+  width: 100%;
+}
+
+.chat-member-multiselect-panel {
+  max-height: min(320px, calc(100vh - 430px)) !important;
+  overflow-y: auto;
+}
+
+.chat-member-selected-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 8px 0;
+}
+
+.chat-member-selected-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid #bae6fd;
+  border-radius: 999px;
+  background: #f0f9ff;
+  color: #0c4a6e;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.chat-member-selected-chip button {
+  border: none;
+  background: transparent;
+  color: #0c4a6e;
+  cursor: pointer;
+  padding: 0;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.chat-member-option.is-selected {
+  background: #ecfeff;
+  border-radius: 8px;
+}
+
+.chat-member-option.is-selected span {
+  font-weight: 700;
+  color: #0f766e;
+}
+
+.chat-member-multiselect {
+  overflow: visible !important;
+}
+
+.chat-member-multiselect-panel {
+  position: relative !important;
+  top: 8px !important;
+  left: auto !important;
+  right: auto !important;
+  z-index: 1 !important;
+  display: none;
+  max-height: 320px;
+}
+
+.chat-member-multiselect.open .chat-member-multiselect-panel {
+  display: block;
+}
+.chat-members-panel {
+  width: min(460px, calc(100vw - 64px));
+  max-height: min(720px, calc(100vh - 170px));
+}
+
+.chat-members-add-box {
+  padding: 12px 14px 16px 14px;
+}
+
+.chat-members-add-title {
+  margin-bottom: 8px;
+  font-size: 15px;
+}
+
+.chat-member-multiselect-btn {
+  height: 42px;
+  padding: 8px 12px;
+  border-radius: 10px;
+}
+
+.chat-member-multiselect-panel {
+  margin-top: 8px;
+  padding: 8px;
+  border-radius: 12px;
+  background: #ffffff;
+  max-height: 280px !important;
+  overflow-y: auto;
+}
+
+.chat-member-multiselect-search {
+  width: 100%;
+  height: 38px;
+  box-sizing: border-box;
+  padding: 0 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  font-size: 14px;
+  outline: none;
+}
+
+.chat-member-multiselect-search:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, .12);
+}
+
+.chat-member-group {
+  margin-top: 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+  overflow: hidden;
+}
+
+.chat-member-group-summary {
+  padding: 8px 10px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+  background: #eef6ff;
+}
+
+.chat-member-group-body {
+  padding: 8px;
+  background: #ffffff;
+}
+
+.chat-member-subtitle {
+  margin: 2px 0 8px 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: #64748b;
+}
+
+.chat-member-option {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 38px;
+  padding: 7px 9px;
+  margin: 2px 0;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.chat-member-option:hover {
+  background: #f1f5f9;
+}
+
+.chat-member-option input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  justify-self: center;
+  accent-color: #2563eb;
+}
+
+.chat-member-option span {
+  min-width: 0;
+  font-size: 13px;
+  line-height: 1.35;
+  color: #0f172a;
+  word-break: break-word;
+}
+
+.chat-member-option.is-selected {
+  background: #ecfeff;
+}
+
+.chat-member-option.is-selected span {
+  font-weight: 700;
+  color: #0f766e;
+}
+
+.chat-member-selected-list {
+  margin-top: 8px;
+  margin-bottom: 6px;
+}
+
+.chat-members-add-actions {
+  padding-top: 10px;
+}
+
+.chat-members-add-submit {
+  height: 42px;
+  border-radius: 10px;
+}
+</style>
+
+<div class="page-card chat-room-page">
+  <div class="chat-room-single-layout">
+    <aside class="chat-group-drawer" id="chatGroupDrawer" hidden>
+      <div class="chat-group-drawer-card">
+        <div class="chat-sidebar-top">
+          <div>
+            <div class="chat-sidebar-title">Nhóm chat</div>
+            <div class="chat-sidebar-subtitle">Mở khi cần, không phơi sẵn</div>
+          </div>
+          <button type="button" id="chatGroupDrawerClose" class="chat-icon-btn" title="Đóng">
+            ✕
+          </button>
+        </div>
+
+        <div class="chat-search-wrap">
+          <input
+            type="text"
+            id="roomGroupSearchInput"
+            class="chat-search-input"
+            placeholder="Tìm nhóm chat..."
+            autocomplete="off"
+          >
+        </div>
+
+        <div class="chat-group-list chat-group-list-drawer" id="roomChatGroupList">
+          {% if groups %}
+            {% for g in groups %}
+              <a
+                href="/chat/{{ g.id }}"
+                class="chat-group-item {% if active_group and active_group.id == g.id %}is-active{% endif %}"
+                data-group-name="{{ (g.name or '')|lower }}"
+              >
+                <div class="chat-group-item-main">
+                  <div class="chat-group-name-row">
+                    <div class="chat-group-name">{{ g.name }}</div>
+                    <div class="chat-group-badges">
+                      <span class="chat-group-badge">{{ g.member_count or 0 }} thành viên</span>
+                      <span
+                        class="chat-group-badge chat-group-badge-new-group {% if not g.has_new_group_badge %}is-hidden{% endif %}"
+                        data-group-id="{{ g.id }}"
+                        data-badge-type="new-group"
+                      >
+                        Nhóm mới
+                      </span>
+					  
+                      <span
+                        class="chat-group-badge chat-group-badge-muted chat-unread-badge {% if not (g.new_message_count or 0) %}is-hidden{% endif %}"
+                        data-group-id="{{ g.id }}"
+                        data-badge-type="unread"
+                      >
+                        {{ g.new_message_count or 0 }} mới
+                      </span>
+                    </div>
+                  </div>
+                  <div class="chat-group-meta">{{ g.group_type }}</div>
+                </div>
+              </a>
+            {% endfor %}
+          {% else %}
+            <div class="chat-empty-state chat-empty-sidebar">
+              Chưa có nhóm chat.
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </aside>
+
+    <div class="chat-drawer-backdrop" id="chatDrawerBackdrop" hidden></div>
+
+    <section class="chat-room-card chat-room-card-full">
+      <header class="chat-room-header">
+        <div class="chat-room-header-left">
+          <button type="button" id="chatGroupDrawerToggle" class="chat-outline-btn">
+            Nhóm chat
+          </button>
+
+          <div class="chat-room-heading">
+            <div class="chat-room-title-row">
+              <h2 class="chat-room-title">{{ active_group.name }}</h2>
+              <span class="chat-room-type">{{ active_group.group_type }}</span>
+            </div>
+            <div class="chat-room-subtitle">
+              Người dùng hiện tại:
+              <strong>{{ current_user_display_name }}</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="chat-room-actions">
+          <a href="/chat" class="chat-text-link">← Quay lại</a>
+          <button type="button" id="memberPanelToggle" class="chat-outline-btn">
+            Thành viên
+          </button>
+        </div>
+
+        <div class="chat-members-panel" id="chatMembersPanel" hidden>
+          <div class="chat-members-panel-header">
+            <div>
+              <div class="chat-members-title">Thành viên nhóm</div>
+              <div class="chat-members-subtitle">
+                {{ group_members|length if group_members else 0 }} thành viên
+              </div>
+            </div>
+            <button type="button" id="memberPanelClose" class="chat-icon-btn" title="Đóng">
+              ✕
+            </button>
+          </div>
+
+          <div class="chat-members-list">
+            {% if group_members %}
+              {% for m in group_members %}
+                <div class="chat-member-row">
+                  <div class="chat-member-avatar">
+                    {{ (m.user.full_name if m.user and m.user.full_name else (m.user.username if m.user else "U"))[:1]|upper }}
+                  </div>
+
+                  <div class="chat-member-info">
+                    <div class="chat-member-top">
+                      <div>
+                        <div class="chat-member-name">
+                          {{ m.user.full_name if m.user and m.user.full_name else (m.user.username if m.user else m.user_id) }}
+                        </div>
+                        <div class="chat-member-role">
+                          {% if m.member_role == "owner" %}
+                            Trưởng nhóm
+                          {% elif m.member_role == "member" %}
+                            Thành viên
+                          {% else %}
+                            {{ m.member_role }}
+                          {% endif %}
+                        </div>
+                      </div>
+
+                      <div class="chat-member-actions">
+                        {% if current_user.id|string == active_group.owner_user_id|string %}
+                          {% if m.user_id|string != active_group.owner_user_id|string %}
+                            <form
+                              method="post"
+                              action="/chat/api/groups/{{ active_group.id }}/members/{{ m.user_id }}/remove"
+                              class="chat-inline-form"
+                              data-confirm="{% if m.user_id == current_user.id %}Xác nhận rời nhóm chat này?{% else %}Xác nhận cho thành viên này rời nhóm?{% endif %}"
+                            >
+                              <button type="submit" class="chat-mini-btn">
+                                {% if m.user_id == current_user.id %}Rời nhóm{% else %}Cho rời nhóm{% endif %}
+                              </button>
+                            </form>
+
+                            <form
+                              method="post"
+                              action="/chat/api/groups/{{ active_group.id }}/owner/transfer"
+                              class="chat-inline-form"
+                              data-confirm="Xác nhận trao quyền Trưởng nhóm cho thành viên này?"
+                            >
+                              <input type="hidden" name="new_owner_user_id" value="{{ m.user_id }}">
+                              <button type="submit" class="chat-mini-btn chat-mini-btn-primary">
+                                Trao quyền Trưởng nhóm
+                              </button>
+                            </form>
+                          {% else %}
+                            <form
+                              method="post"
+                              action="/chat/api/groups/{{ active_group.id }}/disband"
+                              class="chat-inline-form"
+                              data-confirm="Xác nhận giải tán nhóm chat này?"
+                            >
+                              <button type="submit" class="chat-mini-btn chat-mini-btn-danger">
+                                Giải tán nhóm
+                              </button>
+                            </form>
+                          {% endif %}
+                        {% elif m.user_id|string == current_user.id|string %}
+                          <form
+                            method="post"
+                            action="/chat/api/groups/{{ active_group.id }}/members/{{ m.user_id }}/remove"
+                            class="chat-inline-form"
+                            data-confirm="Xác nhận rời nhóm chat này?"
+                          >
+                            <button type="submit" class="chat-mini-btn">
+                              Rời nhóm
+                            </button>
+                          </form>
+                        {% endif %}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              {% endfor %}
+            {% else %}
+              <div class="chat-empty-state">
+                Chưa có thành viên nào.
+              </div>
+            {% endif %}
+          </div>
+
+          {% if current_user.id|string == active_group.owner_user_id|string %}
+            <div class="chat-members-add-box">
+              <div class="chat-members-add-title">Thêm thành viên</div>
+
+              <form method="post" action="/chat/api/groups/{{ active_group.id }}/members/add" class="chat-add-member-form" id="chatAddMemberForm">
+                <div class="chat-member-multiselect" id="chatMemberMultiSelect">
+                  <button type="button" class="chat-member-multiselect-btn" id="chatMemberMultiSelectBtn">
+                    <span class="chat-member-multiselect-label" id="chatMemberMultiSelectLabel">-- Chọn người dùng để thêm vào nhóm --</span>
+                    <span class="chat-member-multiselect-arrow">▼</span>
+                  </button>
+
+                  <div class="chat-member-multiselect-panel" id="chatMemberMultiSelectPanel">
+                    <input
+                      type="text"
+                      class="chat-member-multiselect-search"
+                      id="chatMemberMultiSelectSearch"
+                      placeholder="Tìm theo tên hoặc username..."
+                      autocomplete="off"
+                    >
+
+                    <div class="chat-member-selected-list" id="chatMemberSelectedList"></div>
+
+                    <div class="chat-member-multiselect-list" id="chatMemberMultiSelectList">
+                      {% if available_users_tree.board_users %}
+                        <details class="chat-member-group" open>
+                          <summary class="chat-member-group-summary">HĐTV</summary>
+                          <div class="chat-member-group-body">
+                            {% for u in available_users_tree.board_users %}
+                              <label class="chat-member-option" data-label="{{ u.search_text }}">
+                                <input type="checkbox" name="user_ids" value="{{ u.id }}">
+                                <span>{{ u.label }}</span>
+                              </label>
+                            {% endfor %}
+                          </div>
+                        </details>
+                      {% endif %}
+
+                      {% for dept in available_users_tree.departments %}
+                        {% if dept.teams or dept.direct_users %}
+                          <details class="chat-member-group" open>
+                            <summary class="chat-member-group-summary">{{ dept.name }}</summary>
+                            <div class="chat-member-group-body">
+                              {% for team in dept.teams %}
+                                <details class="chat-member-subgroup" open>
+                                  <summary class="chat-member-subgroup-summary">{{ team.name }}</summary>
+                                  <div class="chat-member-subgroup-body">
+                                    {% for u in team.users %}
+                                      <label class="chat-member-option" data-label="{{ u.search_text }}">
+                                        <input type="checkbox" name="user_ids" value="{{ u.id }}">
+                                        <span>{{ u.label }}</span>
+                                      </label>
+                                    {% endfor %}
+                                  </div>
+                                </details>
+                              {% endfor %}
+
+                              {% if dept.direct_users %}
+                                <div class="chat-member-subtitle">Danh sách người dùng</div>
+                                {% for u in dept.direct_users %}
+                                  <label class="chat-member-option" data-label="{{ u.search_text }}">
+                                    <input type="checkbox" name="user_ids" value="{{ u.id }}">
+                                    <span>{{ u.label }}</span>
+                                  </label>
+                                {% endfor %}
+                              {% endif %}
+                            </div>
+                          </details>
+                        {% endif %}
+                      {% endfor %}
+
+                      {% if available_users_tree.others %}
+                        <details class="chat-member-group" open>
+                          <summary class="chat-member-group-summary">Khác / Chưa phân đơn vị</summary>
+                          <div class="chat-member-group-body">
+                            {% for u in available_users_tree.others %}
+                              <label class="chat-member-option" data-label="{{ u.search_text }}">
+                                <input type="checkbox" name="user_ids" value="{{ u.id }}">
+                                <span>{{ u.label }}</span>
+                              </label>
+                            {% endfor %}
+                          </div>
+                        </details>
+                      {% endif %}
+
+                      {% if (not available_users_tree.board_users) and (not available_users_tree.departments) and (not available_users_tree.others) and available_users %}
+                        <details class="chat-member-group" open>
+                          <summary class="chat-member-group-summary">Danh sách người dùng</summary>
+                          <div class="chat-member-group-body">
+                            {% for u in available_users %}
+                              <label
+                                class="chat-member-option"
+                                data-label="{{ ((u.full_name or '') ~ ' ' ~ (u.username or ''))|lower }}"
+                              >
+                                <input type="checkbox" name="user_ids" value="{{ u.id }}">
+                                <span>{{ u.full_name if u.full_name else u.username }}{% if u.username %} ({{ u.username }}){% endif %}</span>
+                              </label>
+                            {% endfor %}
+                          </div>
+                        </details>
+                      {% endif %}
+
+                      {% if not available_users %}
+                        <div class="chat-member-empty">Không còn người dùng ACTIVE nào để thêm vào nhóm.</div>
+                      {% endif %}
+                    </div>
+                  </div>
+                </div>
+
+                <div class="chat-members-add-actions">
+                  <div class="chat-form-note">Có thể chọn nhiều người cùng lúc.</div>
+                  <button type="submit" class="chat-primary-btn chat-members-add-submit">Thêm thành viên</button>
+                </div>
+              </form>
+            </div>
+          {% endif %}
+        </div>
+      </header>
+
+      {% if chat_notice %}
+        <div class="alert-info chat-room-notice">
+          {{ chat_notice }}
+        </div>
+      {% endif %}
+
+      <div class="chat-room-body">
+        <div class="chat-bulk-toolbar" id="chatBulkToolbar" hidden>
+          <div class="chat-bulk-count" id="chatBulkCount">Đã chọn 0 tin nhắn</div>
+          <div class="chat-bulk-actions">
+            <button type="button" class="chat-mini-btn" id="chatCopySelectedBtn">Copy nhiều tin nhắn</button>
+			<button type="button" class="chat-mini-btn" id="chatClearSelectedBtn">Bỏ chọn</button>
+          </div>
+        </div>
+
+        <div class="chat-pinned-panel {% if not pinned_items %}is-empty{% endif %}" id="chatPinnedPanel">
+          <div class="chat-pinned-panel-header">
+            <div class="chat-pinned-panel-title">Tin/File đã ghim</div>
+            <div class="chat-pinned-panel-subtitle" id="chatPinnedCount">{{ pinned_items|length if pinned_items else 0 }} mục</div>
+          </div>
+          <div class="chat-pinned-list" id="chatPinnedList">
+            {% if pinned_items %}
+              {% for pin in pinned_items %}
+                <button
+                  type="button"
+                  class="chat-pinned-item"
+                  data-pin-kind="{{ pin.pin_kind }}"
+                  data-message-id="{{ pin.message_id }}"
+                  {% if pin.attachment_id %}data-attachment-id="{{ pin.attachment_id }}"{% endif %}
+                >
+                  <span class="chat-pinned-item-label">{{ pin.label }}</span>
+                  <span class="chat-pinned-item-title">{{ pin.title }}</span>
+                  <span class="chat-pinned-item-meta">{{ pin.sender_name }} · {{ pin.pinned_by_name }}{% if pin.pinned_at_text %} · {{ pin.pinned_at_text }}{% endif %}</span>
+                </button>
+              {% endfor %}
+            {% else %}
+              <div class="chat-pinned-empty" id="chatPinnedEmpty">Chưa có tin nhắn hoặc file nào được ghim.</div>
+            {% endif %}
+          </div>
+        </div>
+		
+        <div
+          class="chat-messages"
+          id="chatMessages"
+          data-current-user-id="{{ current_user.id }}"
+          data-group-id="{{ active_group.id }}"
+          data-group-name="{{ active_group.name or 'Nhóm chat' }}"
+        >
+          {% if messages %}
+            {% for msg in messages %}
+              {% set is_mine = (msg.sender_user_id|string == current_user.id|string) %}
+              <div
+                class="chat-message-row {% if is_mine %}is-mine{% else %}is-other{% endif %}"
+                data-message-id="{{ msg.id }}"
+                data-sender-name="{{ msg.sender.full_name if msg.sender and msg.sender.full_name else (msg.sender.username if msg.sender else 'Người dùng') }}"
+                data-created-at="{{ msg.created_at_vn.strftime('%d/%m/%Y %H:%M') if msg.created_at_vn else '' }}"
+                data-created-at-text="{{ msg.created_at_vn.strftime('%d/%m/%Y %H:%M') if msg.created_at_vn else '' }}"
+                data-message-type="{{ msg.message_type or 'TEXT' }}"
+                data-group-name="{{ active_group.name or 'Nhóm chat' }}"
+                data-is-pinned="{{ '1' if msg.is_pinned else '0' }}"
+                data-file-names="{% if msg.attachments %}{% for att in msg.attachments %}{{ att.filename }}{% if not loop.last %}||{% endif %}{% endfor %}{% endif %}"
+              >
+                <label class="chat-select-message">
+                  <input type="checkbox" class="chat-message-check" value="{{ msg.id }}">
+                </label>
+
+                <div class="chat-message-stack">
+                  <div class="chat-message-bubble {% if is_mine %}is-mine{% else %}is-other{% endif %}">
+                    {% if not is_mine %}
+                      <div class="chat-message-sender">
+                        {{ msg.sender.full_name if msg.sender and msg.sender.full_name else (msg.sender.username if msg.sender else "Người dùng") }}
+                      </div>
+                    {% endif %}
+
+                    {% if msg.reply_to %}
+                      <div class="chat-reply-preview">
+                        <div class="chat-reply-preview-name">
+                          {{ msg.reply_to.sender.full_name if msg.reply_to.sender and msg.reply_to.sender.full_name else (msg.reply_to.sender.username if msg.reply_to.sender else "Người dùng") }}
+                        </div>
+                        <div class="chat-reply-preview-text">
+                          {{ msg.reply_to.content or "" }}
+                        </div>
+                      </div>
+                    {% endif %}
+
+                    <div class="chat-message-content">
+                      {% if msg.recalled %}
+                        <em>Tin nhắn đã được thu hồi.</em>
+                      {% elif (msg.message_type or 'TEXT')|upper == 'STICKER' %}
+                        <div class="chat-message-sticker">
+                          <img src="{{ msg.content or '' }}" alt="Sticker">
+                        </div>
+                      {% else %}
+                        {{ msg.content or "" }}
+                      {% endif %}
+                    </div>
+
+                    {% if msg.attachments and not msg.recalled %}
+                      {% for att in msg.attachments %}
+                        <div
+                          class="chat-attachment-item"
+                          data-attachment-id="{{ att.id }}"
+                          data-message-id="{{ msg.id }}"
+                          data-is-pinned="{{ '1' if att.is_pinned else '0' }}"
+                        >
+                          <div class="chat-attachment-links">
+                            <a href="{{ att.preview_url or att.path }}" target="_blank" class="chat-attachment-link">
+                              📎 {{ att.filename }}
+                            </a>
+                            <a href="{{ att.preview_url or att.path }}" target="_blank" class="chat-attachment-mini-link">Xem</a>
+                            <a href="{{ att.download_url or att.path }}" class="chat-attachment-mini-link">Tải về</a>
+                            <button
+                              type="button"
+                              class="chat-attachment-mini-link js-toggle-pin-attachment"
+                              data-attachment-id="{{ att.id }}"
+                              data-message-id="{{ msg.id }}"
+                              data-filename="{{ att.filename }}"
+                              data-is-pinned="{{ '1' if att.is_pinned else '0' }}"
+                            >
+                              {% if att.is_pinned %}Bỏ ghim file{% else %}Ghim file{% endif %}
+                            </button>
+
+                            {% if is_mine and not att.recalled and not att.deleted_by_owner %}
+                              <button
+                                type="button"
+                                class="chat-attachment-mini-link js-recall-attachment"
+                                data-attachment-id="{{ att.id }}"
+                                data-message-id="{{ msg.id }}"
+                                data-filename="{{ att.filename }}"
+                              >
+                                Thu hồi file
+                              </button>
+
+                              <button
+                                type="button"
+                                class="chat-attachment-mini-link js-delete-attachment"
+                                data-attachment-id="{{ att.id }}"
+                                data-message-id="{{ msg.id }}"
+                                data-filename="{{ att.filename }}"
+                              >
+                                Xóa file
+                              </button>
+                            {% endif %}
+                          </div>
+                        </div>
+                      {% endfor %}
+                    {% endif %}
+                  </div>
+
+                  <div class="chat-message-tools {% if is_mine %}is-mine{% else %}is-other{% endif %}">
+                    <div class="chat-reaction-bar" data-message-id="{{ msg.id }}">
+                      <button type="button" class="chat-reaction-btn" data-reaction="like">👍 <span>{{ msg.reaction_counts.like if msg.reaction_counts else 0 }}</span></button>
+                      <button type="button" class="chat-reaction-btn" data-reaction="heart">❤️ <span>{{ msg.reaction_counts.heart if msg.reaction_counts else 0 }}</span></button>
+                      <button type="button" class="chat-reaction-btn" data-reaction="laugh">😄 <span>{{ msg.reaction_counts.laugh if msg.reaction_counts else 0 }}</span></button>
+                    </div>
+
+                    <div class="chat-message-actions">
+                      <button
+                        type="button"
+                        class="chat-mini-btn js-reply-message"
+                        data-message-id="{{ msg.id }}"
+                        data-reply-name="{{ msg.sender.full_name if msg.sender and msg.sender.full_name else (msg.sender.username if msg.sender else 'Người dùng') }}"
+                        data-reply-text="{{ msg.content or '' }}"
+                      >
+                        Trả lời
+                      </button>
+
+                      <button
+                        type="button"
+                        class="chat-mini-btn js-copy-message"
+                        data-copy-text="{{ msg.content or '' }}"
+                        data-sender-name="{{ msg.sender.full_name if msg.sender and msg.sender.full_name else (msg.sender.username if msg.sender else 'Người dùng') }}"
+                        data-created-at-text="{{ msg.created_at_vn.strftime('%d/%m/%Y %H:%M') if msg.created_at_vn else '' }}"
+                        data-message-type="{{ msg.message_type or 'TEXT' }}"
+                        data-recalled="{{ '1' if msg.recalled else '0' }}"
+                        data-file-names="{% if msg.attachments %}{% for att in msg.attachments %}{{ att.filename }}{% if not loop.last %}||{% endif %}{% endfor %}{% endif %}"
+                      >
+                        Chép
+                      </button>
+
+                      <button
+                        type="button"
+                        class="chat-mini-btn js-forward-message"
+                        data-message-id="{{ msg.id }}"
+                        data-message-type="{{ msg.message_type or 'TEXT' }}"
+                        data-forward-text="{{ msg.content or '' }}"
+                        data-sender-name="{{ msg.sender.full_name if msg.sender and msg.sender.full_name else (msg.sender.username if msg.sender else 'Người dùng') }}"
+                        data-created-at="{{ msg.created_at_vn.strftime('%d/%m/%Y %H:%M') if msg.created_at_vn else '' }}"
+                        data-created-at-text="{{ msg.created_at_vn.strftime('%d/%m/%Y %H:%M') if msg.created_at_vn else '' }}"
+                        data-file-names="{% if msg.attachments %}{% for att in msg.attachments %}{{ att.filename }}{% if not loop.last %}||{% endif %}{% endfor %}{% endif %}"
+                      >
+                        Chuyển tiếp
+                      </button>
+
+                      {% if not msg.recalled %}
+                        <button
+                          type="button"
+                          class="chat-mini-btn js-toggle-pin-message"
+                          data-message-id="{{ msg.id }}"
+                          data-is-pinned="{{ '1' if msg.is_pinned else '0' }}"
+                        >
+                          {% if msg.is_pinned %}Bỏ ghim{% else %}Ghim{% endif %}
+                        </button>
+                      {% endif %}
+					  
+                      {% if is_mine and not msg.recalled %}
+                        <button
+                          type="button"
+                          class="chat-mini-btn chat-mini-btn-warning js-recall-message"
+                          data-message-id="{{ msg.id }}"
+                          data-message-type="{{ msg.message_type or 'TEXT' }}"
+                        >
+                          Thu hồi tin nhắn
+                        </button>
+
+                        <button
+                          type="button"
+                          class="chat-mini-btn chat-mini-btn-danger js-delete-message"
+                          data-message-id="{{ msg.id }}"
+                          data-message-type="{{ msg.message_type or 'TEXT' }}"
+                        >
+                          Xóa tin nhắn
+                        </button>
+                      {% endif %}
+                    </div>
+
+                    <div class="chat-message-time {% if is_mine %}is-mine{% else %}is-other{% endif %}">
+                      {{ msg.created_at_vn.strftime('%d/%m/%Y %H:%M') if msg.created_at_vn else "" }}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            {% endfor %}
+          {% else %}
+            <div class="chat-empty-room" id="chatEmptyRoom">
+              <div class="chat-empty-room-title">Chưa có tin nhắn nào</div>
+              <div class="chat-empty-room-subtitle">
+                Bắt đầu trao đổi trong nhóm này bằng ô nhập ở phía dưới.
+              </div>
+            </div>
+          {% endif %}
+        </div>
+
+        <form
+          method="post"
+          action="/chat/api/messages/send"
+          class="chat-composer-form"
+          id="chatComposerForm"
+        >
+          <input type="hidden" name="group_id" value="{{ active_group.id }}">
+          <input type="hidden" name="reply_to_message_id" id="chatReplyToMessageId" value="">
+
+          <div class="chat-composer-replybar" id="chatReplyingBar" hidden>
+            <div class="chat-composer-replybar-meta">
+              <div class="chat-composer-replybar-title">Trả lời</div>
+              <div class="chat-composer-replybar-text" id="chatReplyingText"></div>
+            </div>
+            <button type="button" class="chat-icon-btn chat-composer-replybar-close" id="chatReplyingCancel" title="Hủy trả lời">✕</button>
+          </div>
+
+          <div class="chat-composer-box">
+            <textarea
+              name="content"
+              id="chatComposerInput"
+              class="chat-composer-input chat-composer-textarea"
+              placeholder="Nhập nội dung tin nhắn... (Enter để gửi, Shift+Enter để xuống dòng)"
+              rows="2"
+              required
+            ></textarea>
+
+            <div class="chat-composer-actions">
+              <button type="button" class="chat-outline-btn" id="chatFilePickerButton">Chèn file</button>
+              <input type="file" id="chatFileInput" hidden>
+              <button type="button" class="chat-outline-btn chat-sticker-btn" id="chatStickerPickerButton">Sticker</button>
+              <button type="submit" class="chat-primary-btn chat-send-btn" id="chatSendButton">
+                Gửi
+              </button>
+            </div>
+          </div>
+		  
+		  <div class="chat-sticker-panel" id="chatStickerPanel" hidden>
+            <div class="chat-sticker-panel-header">
+              <div class="chat-sticker-panel-title">Chọn sticker</div>
+              <button type="button" class="chat-icon-btn chat-sticker-close" id="chatStickerCloseButton" title="Đóng">✕</button>
+            </div>
+            <div class="chat-sticker-list" id="chatStickerList">
+              <div class="chat-sticker-empty">Đang tải sticker...</div>
+            </div>
+          </div>
+
+          <div class="chat-composer-note" id="chatComposerNote"></div>
+        </form>
+      </div>
+    </section>
+  </div>
+</div>
+
+<div class="chat-share-modal" id="chatShareModal" hidden>
+  <div class="chat-share-modal-backdrop" id="chatShareBackdrop"></div>
+  <div class="chat-share-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="chatShareModalTitle">
+    <div class="chat-share-modal-header">
+      <div>
+        <div class="chat-share-modal-title" id="chatShareModalTitle">Chuyển tiếp tin nhắn</div>
+        <div class="chat-share-modal-subtitle">Chọn nhóm nhận để chuyển tiếp</div>
+      </div>
+      <button type="button" class="chat-icon-btn" id="chatShareCloseButton" title="Đóng">✕</button>
+    </div>
+
+    <form id="chatShareForm" class="chat-share-form">
+      <input type="hidden" id="chatShareMessageId" value="">
+      <div class="chat-share-preview" id="chatSharePreview"></div>
+
+      <select id="chatShareTargetGroupId" class="chat-select" required>
+        <option value="">-- Chọn nhóm nhận --</option>
+        {% for g in groups %}
+          {% if not active_group or g.id != active_group.id %}
+            <option value="{{ g.id }}">{{ g.name }}</option>
+          {% endif %}
+        {% endfor %}
+      </select>
+
+      <div class="chat-share-actions">
+        <button type="button" class="chat-outline-btn" id="chatShareCancelButton">Hủy</button>
+        <button type="submit" class="chat-primary-btn" id="chatShareSubmitButton">Chuyển tiếp</button>
+      </div>
+
+      <div class="chat-composer-note" id="chatShareNote"></div>
+    </form>
+  </div>
+</div>
+
+<script>
+  function initChatMemberMultiSelect() {
+    var wrap = document.getElementById("chatMemberMultiSelect");
+    var btn = document.getElementById("chatMemberMultiSelectBtn");
+    var label = document.getElementById("chatMemberMultiSelectLabel");
+    var panel = document.getElementById("chatMemberMultiSelectPanel");
+    var search = document.getElementById("chatMemberMultiSelectSearch");
+    var list = document.getElementById("chatMemberMultiSelectList");
+    var selectedList = document.getElementById("chatMemberSelectedList");
+
+    if (!wrap || !btn || !label || !panel || !search || !list || !selectedList) {
+      return;
+    }
+
+    var checkboxes = list.querySelectorAll('input[name="user_ids"]');
+    var options = list.querySelectorAll(".chat-member-option");
+
+    function getOptionText(cb) {
+      var textNode = cb.parentElement ? cb.parentElement.querySelector("span") : null;
+      return textNode ? (textNode.textContent || "").trim() : "";
+    }
+
+    function syncOptionStates() {
+      checkboxes.forEach(function (cb) {
+        if (cb.checked) {
+          cb.parentElement.classList.add("is-selected");
+        } else {
+          cb.parentElement.classList.remove("is-selected");
+        }
+      });
+    }
+
+    function updateLabel() {
+      var selectedTexts = [];
+
+      checkboxes.forEach(function (cb) {
+        if (cb.checked && !cb.disabled) {
+          var text = getOptionText(cb);
+          if (text) {
+            selectedTexts.push(text);
+          }
+        }
+      });
+
+      if (!selectedTexts.length) {
+        label.textContent = "-- Chọn người dùng để thêm vào nhóm --";
+        return;
+      }
+
+      if (selectedTexts.length === 1) {
+        label.textContent = selectedTexts[0];
+        return;
+      }
+
+      label.textContent = "Đã chọn " + selectedTexts.length + " người";
+    }
+
+    function renderSelectedChips() {
+      selectedList.innerHTML = "";
+
+      checkboxes.forEach(function (cb) {
+        if (!cb.checked || cb.disabled) {
+          return;
+        }
+
+        var text = getOptionText(cb);
+        if (!text) {
+          return;
+        }
+
+        var chip = document.createElement("span");
+        chip.className = "chat-member-selected-chip";
+
+        var textSpan = document.createElement("span");
+        textSpan.textContent = text;
+
+        var removeBtn = document.createElement("button");
+        removeBtn.type = "button";
+        removeBtn.textContent = "✕";
+        removeBtn.title = "Bỏ chọn";
+
+        removeBtn.addEventListener("click", function (event) {
+          event.preventDefault();
+          event.stopPropagation();
+          cb.checked = false;
+          syncOptionStates();
+          updateLabel();
+          renderSelectedChips();
+        });
+
+        chip.appendChild(textSpan);
+        chip.appendChild(removeBtn);
+        selectedList.appendChild(chip);
+      });
+    }
+
+    function applyFilter() {
+      var keyword = (search.value || "").trim().toLowerCase();
+
+      options.forEach(function (option) {
+        var text = (option.getAttribute("data-label") || "").toLowerCase();
+        var visible = !keyword || text.indexOf(keyword) >= 0;
+        option.style.display = visible ? "flex" : "none";
+      });
+
+      list.querySelectorAll(".chat-member-subgroup").forEach(function (group) {
+        group.style.display = "";
+        if (keyword) {
+          group.open = true;
+        }
+      });
+
+      list.querySelectorAll(".chat-member-group").forEach(function (group) {
+        group.style.display = "";
+        if (keyword) {
+          group.open = true;
+        }
+      });
+    }
+
+    function scrollToOption(cb) {
+      if (!cb || !cb.parentElement) {
+        return;
+      }
+      cb.parentElement.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest"
+      });
+    }
+
+    btn.addEventListener("click", function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      wrap.classList.toggle("open");
+      if (wrap.classList.contains("open")) {
+        search.focus();
+      }
+    });
+
+    panel.addEventListener("click", function (event) {
+      event.stopPropagation();
+    });
+
+    document.addEventListener("click", function (event) {
+      if (!wrap.contains(event.target)) {
+        wrap.classList.remove("open");
+      }
+    });
+
+    search.addEventListener("input", applyFilter);
+
+    checkboxes.forEach(function (cb) {
+      cb.addEventListener("change", function () {
+        syncOptionStates();
+        updateLabel();
+        renderSelectedChips();
+        if (cb.checked) {
+          scrollToOption(cb);
+        }
+      });
+    });
+
+    syncOptionStates();
+    applyFilter();
+    updateLabel();
+    renderSelectedChips();
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initChatMemberMultiSelect);
+  } else {
+    initChatMemberMultiSelect();
+  }
+</script>
+
+<script src="/static/chat/chat.js"></script>
+{% endblock %}

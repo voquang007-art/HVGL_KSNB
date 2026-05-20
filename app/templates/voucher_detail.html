@@ -1,0 +1,322 @@
+{% extends 'base.html' %}
+{% block content %}
+<style>
+  .voucher-title-font {
+    font-family: inherit;
+    font-weight: 700;
+  }
+
+  .voucher-warning-button {
+    background: #fff3bf !important;
+    color: #5c3b00 !important;
+    border-color: #f0c36d !important;
+  }
+
+  .voucher-top-action {
+    display: inline-block;
+    font-family: inherit;
+    font-weight: 700;
+    background: #fde2e7 !important;
+    color: #0f5fa8 !important;
+    border: 1px solid #f3b6c1 !important;
+    border-radius: 8px;
+    padding: 8px 12px;
+    text-decoration: none;
+    line-height: 1.2;
+    margin-left: 6px;
+  }
+
+  .voucher-top-action:hover {
+    background: #fbd0d9 !important;
+    color: #084f8f !important;
+    text-decoration: none;
+  }
+</style>
+<div class="page-head">
+  <h2>{{ voucher.code }} - {{ voucher.title }}</h2>
+  <div>
+    {% if can_edit_before_board %}
+    <a class="secondary-link voucher-top-action" href="/vouchers/{{ voucher.id }}/edit">Sửa Phiếu</a>
+    {% endif %}
+    <a class="secondary-link voucher-top-action" target="_blank" href="/vouchers/{{ voucher.id }}/print">Xem Phiếu</a>
+    <a class="secondary-link voucher-top-action" href="/vouchers/{{ voucher.id }}/export/pdf">Xuất PDF</a>
+    <a class="secondary-link voucher-top-action" href="/vouchers/{{ voucher.id }}/export.xlsx">Tải Excel</a>
+    <a class="secondary-link voucher-top-action" href="javascript:history.back()">Back</a>
+  </div>
+</div>
+<div class="panel">
+  <div class="grid2">
+    <p><b>Người tạo:</b> {{ voucher.creator_name }}</p>
+    <p><b>Trạng thái:</b> <span class="badge">{{ status_labels.get(voucher.status, voucher.status) }}</span></p>
+    <p><b>Loại hồ sơ:</b> {{ 'Thu quan trọng' if voucher['hồ_so_type'] == 'THU' else 'Chi quan trọng' }}</p>
+    <p><b>Số tiền Mục I:</b> {{ '{:,.0f}'.format(doc_total if docs else (voucher.total_amount or 0)).replace(',', '.') }}</p>
+    <p><b>Tổng Ban KSNB kiểm tra:</b> {{ '{:,.0f}'.format(ksnb_total or 0).replace(',', '.') }}</p>
+    <p><b>Luồng trình:</b> {{ 'Không trình Trưởng ban' if voucher.route_mode == 'DIRECT_BOARD' else 'Trình qua Trưởng ban' }}</p>
+    {% if voucher.route_mode == 'DIRECT_BOARD' %}
+      {% set head_signature = namespace(item=None) %}
+      {% for s in signatures %}
+        {% if s.signer_role in ['TRUONG_BAN', 'TRUONG_BAN_UY_QUYEN'] %}
+          {% set head_signature.item = s %}
+        {% endif %}
+      {% endfor %}
+      {% if head_signature.item %}
+        <p><b>Ô ký Trưởng ban:</b> {{ head_signature.item.signature_text }}</p>
+      {% else %}
+        <p><b>Ô ký Trưởng ban:</b> Sẽ xác định theo người ký khi trình thẳng Hội đồng thành viên.</p>
+      {% endif %}
+    {% endif %}
+  </div>
+</div>
+
+<div class="panel">
+  <h3>II. Nội dung kiểm soát trước</h3>
+  <ol>{% for item in review_items %}<li>{{ item.content }}</li>{% endfor %}</ol>
+</div>
+<div class="panel">
+  <h3>
+    {% if voucher.code and voucher.code.startswith('TM-KSNB') %}
+      III. Bảng đối chiếu thu, chi tiền mặt
+    {% else %}
+      III. Danh mục hồ sơ, tài liệu nhận kiểm soát
+    {% endif %}
+  </h3>
+  <form method="post" action="/vouchers/{{ voucher.id }}/documents/update">
+    <div class="panel" style="margin:0 0 12px 0;">
+      <h3>IV. Kết quả kiểm soát trước</h3>
+      <label>Kết quả kiểm soát trước</label>
+      <select name="section_iv_result">
+        <option value="Hồ sơ đủ điều kiện trình phê duyệt." {% if voucher.section_iv_result == 'Hồ sơ đủ điều kiện trình phê duyệt.' %}selected{% endif %}>Hồ sơ đủ điều kiện trình phê duyệt.</option>
+        <option value="Hồ sơ cần bổ sung, chỉnh sửa trước khi trình phê duyệt." {% if voucher.section_iv_result == 'Hồ sơ cần bổ sung, chỉnh sửa trước khi trình phê duyệt.' %}selected{% endif %}>Hồ sơ cần bổ sung, chỉnh sửa trước khi trình phê duyệt.</option>
+        <option value="Hồ sơ chưa đủ điều kiện trình phê duyệt." {% if voucher.section_iv_result == 'Hồ sơ chưa đủ điều kiện trình phê duyệt.' %}selected{% endif %}>Hồ sơ chưa đủ điều kiện trình phê duyệt.</option>
+      </select>
+      <label>Ghi chú Mục IV</label>
+      <textarea name="section_iv_note" placeholder="Nhập ghi chú kết quả kiểm soát trước nếu có">{{ voucher.section_iv_note or '' }}</textarea>
+    </div>
+
+    <table class="table compact">
+      <thead>
+        <tr>
+          <th>STT</th>
+          <th>Nguồn</th>
+          {% if not (voucher.code and voucher.code.startswith('TM-KSNB')) %}
+          <th>Nhà cung cấp</th>
+          {% endif %}
+          <th>Nội dung</th>
+          <th>Số tiền tài liệu</th>
+          <th>Ban KSNB KT</th>
+          <th>Hình thức/Ghi chú</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for d in docs %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td>{{ d.source_type }}</td>
+          {% if not (voucher.code and voucher.code.startswith('TM-KSNB')) %}
+          <td>{{ d.supplier }}</td>
+          {% endif %}
+          <td>{{ d.content }}</td>
+          <td class="num">{{ '{:,.0f}'.format(d.document_amount or 0).replace(',', '.') }}</td>
+          <td>
+            <select name="check_type_{{ d.id }}">
+              <option value="MATCH" {% if d.ksnb_check_type == 'MATCH' %}selected{% endif %}>✓ Đúng</option>
+              <option value="DIFFERENT" {% if d.ksnb_check_type == 'DIFFERENT' %}selected{% endif %}>Sai - nhập số</option>
+              <option value="REJECTED" {% if d.ksnb_check_type == 'REJECTED' %}selected{% endif %}>Từ chối thanh toán</option>
+            </select>
+            <input name="checked_amount_{{ d.id }}" value="{{ d.ksnb_checked_amount or '' }}" placeholder="Nhập số kiểm tra">
+          </td>
+          <td>
+            <label class="inline-check"><input type="checkbox" name="payment_transfer_{{ d.id }}" value="1" {% if d.payment_transfer %}checked{% endif %}> Chuyển khoản</label>
+            <label class="inline-check"><input type="checkbox" name="payment_cash_{{ d.id }}" value="1" {% if d.payment_cash %}checked{% endif %}> Tiền mặt</label>
+            <input name="note_{{ d.id }}" value="{{ d.ksnb_note or '' }}" placeholder="Ghi chú của nhân viên kiểm soát">
+          </td>
+        </tr>
+      {% else %}
+        <tr>
+          <td colspan="{% if voucher.code and voucher.code.startswith('TM-KSNB') %}6{% else %}7{% endif %}" class="empty">
+            Chưa có dữ liệu Mục III. Có thể tạo Phiếu mới và import Excel.
+          </td>
+        </tr>
+      {% endfor %}
+      {% if docs %}
+        <tr class="total-row">
+          <td colspan="{% if voucher.code and voucher.code.startswith('TM-KSNB') %}3{% else %}4{% endif %}"><b>Tổng cộng</b></td>
+          <td class="num"><b>{{ '{:,.0f}'.format(doc_total or 0).replace(',', '.') }}</b></td>
+          <td class="num"><b>{{ '{:,.0f}'.format(ksnb_total or 0).replace(',', '.') }}</b></td>
+          <td class="num">
+            <b>{{ '{:,.0f}'.format((doc_total or 0) - (ksnb_total or 0)).replace(',', '.') }}</b>
+          </td>
+        </tr>
+      {% endif %}
+      </tbody>
+    </table>
+    {% if can_edit_before_board %}<button class="secondary voucher-title-font voucher-warning-button" type="submit">Cập nhật kiểm tra Mục III</button>{% endif %}
+  </form>
+</div>
+
+<div class="panel">
+  <h3>Cảnh báo đối chiếu Sổ THCN phải trả</h3>
+  <p class="muted">
+    Cảnh báo này chỉ là dữ liệu thống kê nội bộ để người kiểm soát xem xét; không tự động đưa vào nội dung Phiếu kiểm soát.
+  </p>
+  <table class="table compact">
+    <thead>
+      <tr>
+        <th>STT</th>
+        <th>Nhà cung cấp trên hồ sơ</th>
+        <th>Nguồn</th>
+        <th>Số thanh toán theo hồ sơ</th>
+        <th>Số phải trả theo Sổ THCN</th>
+        <th>Số vượt</th>
+        <th>Nội dung cảnh báo</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for w in payable_warnings %}
+      <tr>
+        <td>{{ loop.index }}</td>
+        <td>
+          <details>
+            <summary style="cursor:pointer;font-weight:bold;">
+              {{ w.supplier_name }}
+            </summary>
+            {% if w.matched_payable_name and w.matched_payable_name != w.supplier_name %}
+            <p class="muted">Khớp Sổ THCN: {{ w.matched_payable_name }}</p>
+            {% endif %}
+            {% set detail_rows = payable_details_by_key.get(w.supplier_key, []) %}
+            {% if detail_rows %}
+            <table class="table compact" style="margin-top:8px;">
+              <thead>
+                <tr>
+                  <th>Mã NCC</th>
+                  <th>Tên NCC theo Sổ THCN</th>
+                  <th>Dư Nợ đầu kỳ</th>
+                  <th>Dư Có đầu kỳ</th>
+                  <th>Phát sinh Nợ</th>
+                  <th>Phát sinh Có</th>
+                  <th>Dư Nợ cuối kỳ</th>
+                  <th>Dư Có cuối kỳ</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for item in detail_rows %}
+                <tr>
+                  <td>{{ item.supplier_code or '' }}</td>
+                  <td>{{ item.supplier_name or '' }}</td>
+                  <td class="num">{{ '{:,.0f}'.format(item.opening_debit or 0).replace(',', '.') }}</td>
+                  <td class="num">{{ '{:,.0f}'.format(item.opening_credit or 0).replace(',', '.') }}</td>
+                  <td class="num">{{ '{:,.0f}'.format(item.period_debit or 0).replace(',', '.') }}</td>
+                  <td class="num">{{ '{:,.0f}'.format(item.period_credit or 0).replace(',', '.') }}</td>
+                  <td class="num">{{ '{:,.0f}'.format(item.ending_debit or 0).replace(',', '.') }}</td>
+                  <td class="num">{{ '{:,.0f}'.format(item.ending_credit or 0).replace(',', '.') }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+            {% else %}
+            <p class="muted">Chưa có dữ liệu chi tiết Nợ/Có của nhà cung cấp này.</p>
+            {% endif %}
+          </details>
+        </td>
+        <td>{{ w.source_types or '' }}</td>
+        <td class="num">{{ '{:,.0f}'.format(w.control_payment_amount or 0).replace(',', '.') }}</td>
+        <td class="num">{{ '{:,.0f}'.format(w.payable_amount or 0).replace(',', '.') }}</td>
+        <td class="num"><b>{{ '{:,.0f}'.format(w.over_amount or 0).replace(',', '.') }}</b></td>
+        <td>{{ w.warning_message }}</td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="7" class="empty">Không có cảnh báo vượt số phải trả nhà cung cấp theo Sổ THCN.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="panel">
+  {% for sec in optional_sections %}
+  <h3>{{ sec.roman }}. {{ sec.title }}</h3>
+  <p>{{ sec.content }}</p>
+  {% endfor %}
+
+  <h3>{{ conclusion_roman }}. Kết luận của Ban Kiểm soát nội bộ</h3>
+  <p>{{ conclusion_text }}</p>
+</div>
+
+<div class="panel">
+  <h3>Chữ ký số nội bộ</h3>
+  <table class="table compact"><thead><tr><th>Người ký</th><th>Vai trò ký</th><th>Nội dung</th><th>Thời điểm</th></tr></thead><tbody>
+    {% for s in signatures %}<tr><td>{{ s.signer_name }}</td><td>{{ s.signer_role }}</td><td><pre>{{ s.signature_text }}</pre></td><td>{{ s.signed_at }}</td></tr>{% else %}<tr><td colspan="4" class="empty">Chưa có chữ ký.</td></tr>{% endfor %}
+  </tbody></table>
+</div>
+
+<div class="actions">
+  {% if can_creator and voucher.status == 'DRAFT' %}
+  <div class="alert">
+    Phiếu đang ở trạng thái Nháp. Bạn có thể tiếp tục sửa Phiếu hoặc chọn hình thức trình khi hồ sơ đã hoàn thiện.
+  </div>
+  {% if voucher.route_mode == 'DIRECT_BOARD' %}
+  <form method="post" action="/vouchers/{{ voucher.id }}/submit" class="panel" style="margin-top:12px;">
+    <h3>Ký số nội bộ và trình thẳng HĐTV</h3>
+    <p class="muted">
+      Chọn vị trí Hội đồng thành viên tiếp nhận Phiếu do nhân viên Ban KSNB ký số và trình thẳng.
+    </p>
+    <label>Chọn vị trí Hội đồng thành viên nhận trình</label>
+    <select name="board_user_id" required>
+      <option value="">-- Chọn Hội đồng thành viên --</option>
+      {% for b in board_users %}
+      <option value="{{ b.id }}">{{ b.full_name }} - {{ b.position_title }}</option>
+      {% endfor %}
+    </select>
+    <button class="primary voucher-title-font" type="submit" style="margin-top:10px;" onclick="return confirm('Bạn chắc chắn muốn ký số nội bộ và trình thẳng Phiếu đến Hội đồng thành viên đã chọn?');">Ký số nội bộ và trình thẳng HĐTV</button>
+  </form>
+  {% else %}
+  <form method="post" action="/vouchers/{{ voucher.id }}/submit">
+    <button class="primary voucher-title-font" type="submit">Ký số nội bộ và trình</button>
+  </form>
+  {% endif %}
+
+  <form method="post" action="/vouchers/{{ voucher.id }}/submit-no-signature" class="panel" style="margin-top:12px;">
+    <h3>Không ký số</h3>
+    <p class="muted">
+      Chọn chức năng này thì Phiếu in ra chỉ hiển thị tên người kiểm soát và tên Trưởng/Phó Trưởng ban KSNB tại ô ký, không ghi nhận ký số nội bộ.
+    </p>
+    <label>Chọn Trưởng/Phó Trưởng ban KSNB để in tên tại ô ký</label>
+    <select name="no_sign_head_user_id" required>
+      <option value="">-- Chọn Trưởng/Phó Trưởng ban KSNB --</option>
+      {% for h in heads %}
+      <option value="{{ h.id }}" {% if voucher.current_handler == h.id %}selected{% endif %}>{{ h.full_name }} - {{ h.position_title }}</option>
+      {% endfor %}
+    </select>
+        <button class="primary voucher-title-font" type="submit" style="margin-top:10px;" onclick="return confirm('Bạn chắc chắn muốn lưu Phiếu theo hình thức không ký số? Phiếu sẽ in tên người kiểm soát và Trưởng/Phó Trưởng ban KSNB ở cuối phiếu, không trình HĐTV.');">Không ký số và lưu nội bộ</button>
+  </form>
+  {% endif %}
+
+  {% if can_head and voucher.status == 'SUBMITTED_TO_HEAD' %}
+  <form method="post" action="/vouchers/{{ voucher.id }}/head-approve" class="panel" style="margin-top:12px;">
+    <h3>Trưởng ban/Phó Trưởng ban KSNB ký số và trình HĐTV</h3>
+    <p class="muted">
+      Chọn vị trí Hội đồng thành viên tiếp nhận Phiếu sau khi Trưởng ban/Phó Trưởng ban KSNB ký số nội bộ.
+    </p>
+    <label>Chọn vị trí Hội đồng thành viên nhận trình</label>
+    <select name="board_user_id" required>
+      <option value="">-- Chọn Hội đồng thành viên --</option>
+      {% for b in board_users %}
+      <option value="{{ b.id }}">{{ b.full_name }} - {{ b.position_title }}</option>
+      {% endfor %}
+    </select>
+    <button class="primary voucher-title-font" type="submit" style="margin-top:10px;" onclick="return confirm('Bạn chắc chắn muốn ký số nội bộ và trình Phiếu đến Hội đồng thành viên đã chọn?');">Ký số nội bộ và trình HĐTV</button>
+  </form>
+  {% endif %}
+  {# Đã ẩn nút HĐTV xem và lưu Phiếu.
+     Luồng hiện tại: HĐTV bấm Xem tại danh sách để mở mẫu phiếu in;
+     hệ thống ghi nhận đã xem tại route /vouchers/{{ voucher.id }}/print. #}
+</div>
+
+<div class="panel">
+  <h3>Lịch sử luân chuyển</h3>
+  <table class="table compact"><thead><tr><th>Thời điểm</th><th>Hành động</th><th>Từ</th><th>Đến</th><th>Ghi chú</th></tr></thead><tbody>
+    {% for r in routes %}<tr><td>{{ r.created_at }}</td><td>{{ r.action }}</td><td>{{ r.from_name }}</td><td>{{ r.to_name }}</td><td>{{ r.note }}</td></tr>{% else %}<tr><td colspan="5" class="empty">Chưa có luân chuyển.</td></tr>{% endfor %}
+  </tbody></table>
+</div>
+{% endblock %}

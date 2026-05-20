@@ -1,0 +1,429 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title or 'HVGL KSNB' }}</title>
+  <meta name="csrf-token" content="{{ request.state.csrf_token or '' }}">
+  <meta name="theme-color" content="#0f766e">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="HVGL KSNB">
+  <link rel="manifest" href="/static/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/static/images/logo.png">
+  <link rel="stylesheet" href="/static/style.css">
+  <style>
+    .company,
+    .app-title {
+      font-family: "Segoe UI", Arial, sans-serif;
+      letter-spacing: 0;
+      line-height: 1.25;
+    }
+
+    .company {
+      color: #ffffff;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .app-title {
+      color: #fff3bf;
+      font-weight: 650;
+    }
+
+    .nav a.hvgl-nav-link {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-family: inherit;
+      font-weight: 700;
+      border-radius: 10px;
+      transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .nav a.hvgl-nav-link.is-active {
+      background: #dbeafe !important;
+      color: #075985 !important;
+      box-shadow: inset 0 0 0 1px #93c5fd;
+    }
+
+    .nav a.hvgl-nav-link.is-active .hvgl-nav-text {
+      color: #075985 !important;
+    }
+
+    .hvgl-nav-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 18px;
+      height: 18px;
+      padding: 0 5px;
+      border-radius: 999px;
+      background: #dc2626;
+      color: #ffffff;
+      font-size: 12px;
+      font-weight: 800;
+      line-height: 1;
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.65);
+    }
+
+    .hvgl-nav-badge[hidden] {
+      display: none !important;
+    }
+
+    .app-footer {
+      margin: 18px auto 10px auto;
+      padding: 10px 12px;
+      text-align: center;
+      color: #b77900;
+      font-style: italic;
+      font-weight: 700;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body class="{% if not request.state.user %}auth-page{% endif %}">
+  <header class="topbar">
+    <div class="brandbox">
+      <img class="brand-logo" src="/static/images/logo.png" alt="Logo">
+      <div>
+        <div class="company">CÔNG TY TNHH BỆNH VIỆN HÙNG VƯƠNG GIA LAI</div>
+        <div class="app-title">Cổng làm việc Ban Kiểm soát nội bộ</div>
+      </div>
+    </div>
+    {% if request.state.user %}
+    <div class="userbox">
+      <b>{{ request.state.user.full_name }}</b><br>
+      <span>{{ request.state.user.position_title }}</span>
+    </div>
+    <button type="button" class="mobile-nav-toggle" id="mobileNavToggle" aria-controls="mainNav" aria-expanded="false">
+      ☰ Menu
+    </button>
+    {% endif %}
+  </header>
+  {% if request.state.user %}
+  {% set role_code = request.state.user.role_code %}
+  {% set is_admin = role_code == 'ADMIN' %}
+  {% set is_ksnb = role_code in ['TRUONG_BAN_KSNB', 'PHO_TRUONG_BAN_KSNB', 'NHAN_VIEN_KSNB'] %}
+  {% set is_board = role_code in ['TONG_GIAM_DOC', 'PHO_TGD_THUONG_TRUC', 'PHO_TONG_GIAM_DOC'] %}
+  <nav class="nav" id="mainNav" aria-label="Điều hướng chính">
+    {% if is_admin or is_ksnb or is_board %}
+    <a class="hvgl-nav-link {% if request.url.path.startswith('/revenue-control') or request.url.path.startswith('/vouchers') or request.url.path.startswith('/cash-control') or request.url.path.startswith('/control-statistics') %}is-active{% endif %}" href="/revenue-control" data-nav-key="revenue_control">
+      <span class="hvgl-nav-text">Kiểm soát công tác thu, chi</span>
+      <span class="hvgl-nav-badge" data-badge-key="revenue_control" hidden></span>
+    </a>
+    {% endif %}
+
+    <a class="hvgl-nav-link {% if request.url.path.startswith('/chat') %}is-active{% endif %}" href="/chat" data-nav-key="chat">
+      <span class="hvgl-nav-text">Trao đổi nội bộ</span>
+      <span class="hvgl-nav-badge" data-badge-key="chat" hidden></span>
+    </a>
+    <a class="hvgl-nav-link {% if request.url.path.startswith('/meetings') %}is-active{% endif %}" href="/meetings" data-nav-key="meetings">
+      <span class="hvgl-nav-text">Họp trực tuyến</span>
+      <span class="hvgl-nav-badge" data-badge-key="meetings" hidden></span>
+    </a>
+
+    {% if is_admin or is_ksnb %}
+    <a class="hvgl-nav-link {% if request.url.path.startswith('/documents') %}is-active{% endif %}" href="/documents" data-nav-key="documents">
+      <span class="hvgl-nav-text">Kho tài liệu</span>
+    </a>
+    {% endif %}
+
+    {% if is_admin or is_ksnb or is_board %}
+    <a class="hvgl-nav-link {% if request.url.path.startswith('/draft-approvals') or request.url.path.startswith('/draft-approval') %}is-active{% endif %}" href="/draft-approvals" data-nav-key="draft_approvals">
+      <span class="hvgl-nav-text">Phê duyệt dự thảo văn bản</span>
+      <span class="hvgl-nav-badge" data-badge-key="draft_approvals" hidden></span>
+    </a>
+    {% endif %}
+
+    {% if is_admin %}
+    <a class="hvgl-nav-link {% if request.url.path.startswith('/admin/users') %}is-active{% endif %}" href="/admin/users" data-nav-key="admin_users">
+      <span class="hvgl-nav-text">Quản trị người dùng</span>
+    </a>
+    {% endif %}
+
+    <a class="logout" href="/logout">Đăng xuất</a>
+  </nav>
+  {% endif %}
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+  <script>
+    (function () {
+      "use strict";
+
+      var csrfMeta = document.querySelector('meta[name="csrf-token"]');
+      var csrfToken = csrfMeta ? String(csrfMeta.getAttribute("content") || "") : "";
+
+      function isUnsafeMethod(method) {
+        var normalized = String(method || "GET").toUpperCase();
+        return normalized === "POST" || normalized === "PUT" || normalized === "PATCH" || normalized === "DELETE";
+      }
+
+      function isSameOriginUrl(url) {
+        try {
+          return new URL(url, window.location.href).origin === window.location.origin;
+        } catch (err) {
+          return false;
+        }
+      }
+
+      function ensureFormCsrfField(form) {
+        if (!form || !csrfToken) {
+          return;
+        }
+
+        var method = String(form.getAttribute("method") || "GET").toUpperCase();
+        if (!isUnsafeMethod(method)) {
+          return;
+        }
+
+        var action = form.getAttribute("action") || window.location.href;
+        if (!isSameOriginUrl(action)) {
+          return;
+        }
+
+        var input = form.querySelector('input[name="csrf_token"]');
+        if (!input) {
+          input = document.createElement("input");
+          input.type = "hidden";
+          input.name = "csrf_token";
+          form.appendChild(input);
+        }
+        input.value = csrfToken;
+      }
+
+      function ensureAllPostFormsHaveCsrf() {
+        document.querySelectorAll("form").forEach(function (form) {
+          ensureFormCsrfField(form);
+        });
+      }
+
+      document.addEventListener("DOMContentLoaded", ensureAllPostFormsHaveCsrf);
+
+      document.addEventListener("submit", function (event) {
+        ensureFormCsrfField(event.target);
+      }, true);
+
+      if (window.fetch && csrfToken) {
+        var originalFetch = window.fetch.bind(window);
+
+        window.fetch = function (input, init) {
+          init = init || {};
+          var url = typeof input === "string" ? input : (input && input.url ? input.url : window.location.href);
+          var method = init.method || (input && input.method) || "GET";
+
+          if (isUnsafeMethod(method) && isSameOriginUrl(url)) {
+            var headers = new Headers(init.headers || (input && input.headers) || {});
+            if (!headers.has("X-CSRF-Token")) {
+              headers.set("X-CSRF-Token", csrfToken);
+            }
+            init.headers = headers;
+          }
+
+          return originalFetch(input, init);
+        };
+      }
+    })();
+  </script>
+  <script>
+    (function () {
+      "use strict";
+
+      function initMobileNav() {
+        var btn = document.getElementById("mobileNavToggle");
+        var nav = document.getElementById("mainNav");
+        if (!btn || !nav) {
+          return;
+        }
+
+        function closeNav() {
+          nav.classList.remove("is-open");
+          btn.setAttribute("aria-expanded", "false");
+        }
+
+        btn.addEventListener("click", function (event) {
+          event.preventDefault();
+          var isOpen = nav.classList.toggle("is-open");
+          btn.setAttribute("aria-expanded", isOpen ? "true" : "false");
+        });
+
+        nav.addEventListener("click", function (event) {
+          if (event.target && event.target.closest("a")) {
+            closeNav();
+          }
+        });
+
+        document.addEventListener("click", function (event) {
+          if (!nav.classList.contains("is-open")) {
+            return;
+          }
+          if (nav.contains(event.target) || btn.contains(event.target)) {
+            return;
+          }
+          closeNav();
+        });
+
+        window.addEventListener("resize", function () {
+          if (window.innerWidth > 860) {
+            closeNav();
+          }
+        });
+      }
+
+      function registerServiceWorker() {
+        if (!("serviceWorker" in navigator)) {
+          return;
+        }
+
+        if (window.location.protocol === "file:") {
+          return;
+        }
+
+        window.addEventListener("load", function () {
+          navigator.serviceWorker.register("/static/service-worker.js").catch(function () {
+            /* Không làm gián đoạn ứng dụng nếu trình duyệt không đăng ký được service worker. */
+          });
+        });
+      }
+
+      document.addEventListener("DOMContentLoaded", initMobileNav);
+      registerServiceWorker();
+    })();
+  </script>
+  {% if request.state.user %}
+  <footer class="app-footer">
+    Ứng dụng được phát triển bởi Võ Như Minh Quang
+  </footer>
+  <script>
+    (function () {
+      "use strict";
+
+      function updateBadge(key, badgeData) {
+        var badges = document.querySelectorAll('[data-badge-key="' + key + '"]');
+        var badgeTexts = document.querySelectorAll('[data-badge-text-key="' + key + '"]');
+        var count = Number((badgeData && badgeData.count) || 0);
+        var display = String((badgeData && badgeData.display) || "").trim();
+        var title = String((badgeData && badgeData.title) || "").trim();
+
+        badges.forEach(function (badge) {
+          var navLink = badge.closest(".hvgl-nav-link");
+
+          if (!count || !display) {
+            badge.hidden = true;
+            badge.textContent = "";
+            badge.removeAttribute("title");
+            if (navLink) {
+              navLink.removeAttribute("title");
+            }
+            return;
+          }
+
+          badge.textContent = display;
+          badge.hidden = false;
+
+          if (title) {
+            badge.setAttribute("title", title);
+            if (navLink) {
+              navLink.setAttribute("title", title);
+            }
+          } else {
+            badge.removeAttribute("title");
+            if (navLink) {
+              navLink.removeAttribute("title");
+            }
+          }
+        });
+
+        badgeTexts.forEach(function (badgeText) {
+          if (count > 0) {
+            badgeText.hidden = false;
+            if (title) {
+              badgeText.setAttribute("title", title);
+            }
+          } else {
+            badgeText.hidden = true;
+            badgeText.removeAttribute("title");
+          }
+        });
+      }
+
+      function clearBadges() {
+        document.querySelectorAll("[data-badge-key]").forEach(function (badge) {
+          var navLink = badge.closest(".hvgl-nav-link");
+          badge.hidden = true;
+          badge.textContent = "";
+          badge.removeAttribute("title");
+          if (navLink) {
+            navLink.removeAttribute("title");
+          }
+        });
+      }
+	  
+      function updateRevenueControlBadge(badges) {
+        var voucherBadge = badges && badges.vouchers ? badges.vouchers : {};
+        var cashBadge = badges && badges.cash_control ? badges.cash_control : {};
+        var voucherCount = Number(voucherBadge.count || 0);
+        var cashCount = Number(cashBadge.count || 0);
+        var totalCount = voucherCount + cashCount;
+        var titleParts = [];
+
+        if (voucherCount > 0) {
+          titleParts.push("Có " + voucherCount + " phiếu hồ sơ thu, chi quan trọng chờ xử lý");
+        }
+
+        if (cashCount > 0) {
+          titleParts.push("Có " + cashCount + " phiếu thu, chi tiền mặt chờ xử lý");
+        }
+
+        updateBadge("revenue_control", {
+          count: totalCount,
+          display: totalCount > 99 ? "99+" : String(totalCount || ""),
+          title: titleParts.join("; ")
+        });
+      }	  
+
+      function refreshNavBadges() {
+        fetch("/api/nav-badges", {
+          method: "GET",
+          credentials: "same-origin",
+          headers: {
+            "Accept": "application/json"
+          }
+        })
+          .then(function (response) {
+            if (!response.ok) {
+              throw new Error("Badge API lỗi");
+            }
+            return response.json();
+          })
+          .then(function (payload) {
+            if (!payload || !payload.ok || !payload.badges) {
+              clearBadges();
+              return;
+            }
+
+            updateRevenueControlBadge(payload.badges);
+            updateBadge("vouchers", payload.badges.vouchers);
+            updateBadge("cash_control", payload.badges.cash_control);
+            updateBadge("chat", payload.badges.chat);
+            updateBadge("meetings", payload.badges.meetings);
+            updateBadge("draft_approvals", payload.badges.draft_approvals);
+          })
+          .catch(function () {
+            clearBadges();
+          });
+      }
+
+      document.addEventListener("DOMContentLoaded", function () {
+        refreshNavBadges();
+        window.setInterval(refreshNavBadges, 15000);
+      });
+
+      window.addEventListener("focus", refreshNavBadges);
+      window.addEventListener("hvgl:notify", refreshNavBadges);
+    })();
+  </script>
+  {% endif %}
+</body>
+</html>

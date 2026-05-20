@@ -1,0 +1,299 @@
+{% extends 'base.html' %}
+{% block content %}
+<style>
+  .revenue-control-hero {
+    background: linear-gradient(135deg, #0b4d8b, #0f766e);
+    color: #ffffff;
+    border-radius: 18px;
+    padding: 22px 24px;
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.14);
+    margin-bottom: 18px;
+  }
+
+  .revenue-control-hero h2 {
+    margin: 0;
+    font-size: 26px;
+    line-height: 1.25;
+    text-transform: uppercase;
+  }
+
+  .revenue-control-hero p {
+    margin: 8px 0 0 0;
+    color: #e0f2fe;
+    font-size: 15px;
+    line-height: 1.5;
+  }
+
+  .revenue-control-slogan {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 18px;
+  }
+
+  .revenue-control-slogan span {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 36px;
+    padding: 7px 14px;
+    border-radius: 999px;
+    background: rgba(255, 243, 191, 0.96);
+    color: #7c4a00;
+    font-family: Arial, sans-serif;
+    font-size: 15px;
+    font-weight: 750;
+    line-height: 1.35;
+    letter-spacing: normal;
+    font-stretch: normal;
+    transform: none;
+    box-shadow: 0 0 0 1px rgba(255,255,255,0.45);
+  }
+
+  .revenue-control-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+    align-items: stretch;
+  }
+
+  .revenue-control-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    min-height: 430px;
+    padding: 28px 22px;
+    border-radius: 18px;
+    background: #ffffff;
+    border: 1px solid #dbe4ee;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+    overflow: hidden;
+  }
+
+  .revenue-control-card::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 5px;
+    background: #0b4d8b;
+  }
+
+  .revenue-control-card.cash::before {
+    background: #0f766e;
+  }
+
+  .revenue-control-card.stats::before {
+    background: #b77900;
+  }
+
+  .revenue-control-icon {
+    width: 46px;
+    height: 46px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 14px;
+    background: #e8f2ff;
+    color: #0b4d8b;
+    font-size: 24px;
+    margin-bottom: 14px;
+  }
+
+  .revenue-control-card.cash .revenue-control-icon {
+    background: #ecfdf5;
+    color: #0f766e;
+  }
+
+  .revenue-control-card.stats .revenue-control-icon {
+    background: #fff7ed;
+    color: #b77900;
+  }
+
+  .revenue-control-card h3 {
+    margin: 0;
+    color: #0f172a;
+    font-size: 19px;
+    line-height: 1.3;
+  }
+
+  .revenue-control-title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .revenue-control-title-row h3 {
+    margin: 0;
+  }
+
+  .revenue-control-card-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 22px;
+    height: 22px;
+    padding: 0 7px;
+    border-radius: 999px;
+    background: #dc2626;
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 900;
+    line-height: 1;
+    box-shadow: 0 0 0 2px #ffffff;
+  }
+
+  .revenue-control-card-badge[hidden] {
+    display: none !important;
+  }
+
+  .revenue-control-new-text {
+    display: inline-flex;
+    align-items: center;
+    min-height: 22px;
+    padding: 0 8px;
+    border-radius: 999px;
+    background: #fff3bf;
+    color: #7c2d12;
+    font-size: 12px;
+    font-weight: 800;
+    border: 1px solid #f0c36d;
+  }
+
+  .revenue-control-new-text[hidden] {
+    display: none !important;
+  }
+
+  .revenue-control-card p {
+    margin: 10px 0 14px 0;
+    color: #475569;
+    line-height: 1.5;
+    flex: 1 1 auto;
+  }
+
+  .revenue-control-list {
+    margin: 0 0 16px 0;
+    padding-left: 18px;
+    color: #334155;
+    line-height: 1.55;
+  }
+
+  .revenue-control-action {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 42px;
+    margin-top: auto;
+    padding: 10px 14px;
+    border-radius: 11px;
+    text-decoration: none;
+    font-family: Arial, sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 1.35;
+    letter-spacing: normal;
+    font-stretch: normal;
+    transform: none;
+    background: #0b4d8b;
+    color: #ffffff;
+  }
+
+  .revenue-control-card.cash .revenue-control-action {
+    background: #0f766e;
+  }
+
+  .revenue-control-card.stats .revenue-control-action {
+    background: #b77900;
+  }
+
+  .revenue-control-action:hover {
+    filter: brightness(0.94);
+    color: #ffffff;
+    text-decoration: none;
+  }
+
+  @media(max-width: 1100px) {
+    .revenue-control-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .revenue-control-card {
+      min-height: 300px;
+    }
+  }
+  .revenue-control-slogan span,
+  .revenue-control-action {
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }  
+</style>
+
+<div class="revenue-control-hero">
+  <h2>Kiểm soát công tác thu, chi</h2>
+  <p>
+    Thực hiện các nghiệp vụ kiểm soát hồ sơ chi chuyển khoản, tiền mặt; kiểm soát thu, chi tiền mặt hằng ngày;
+    và Thống kê kết quả kiểm soát phục vụ công tác quản trị nội bộ.
+  </p>
+
+  <div class="revenue-control-slogan">
+    <span>Tuân thủ pháp luật</span>
+    <span>Liêm chính</span>
+    <span>Tận tâm</span>
+    <span>Trung thực</span>
+    <span>Công minh</span>
+    <span>Chuyên nghiệp</span>
+  </div>
+</div>
+
+<div class="revenue-control-grid">
+  <div class="revenue-control-card">
+    <div class="revenue-control-icon">📄</div>
+    <div class="revenue-control-title-row">
+      <h3>Kiểm soát hồ sơ thu, chi quan trọng</h3>
+      <span class="revenue-control-card-badge hvgl-nav-badge" data-badge-key="vouchers" hidden></span>
+      <span class="revenue-control-new-text" data-badge-text-key="vouchers" hidden>Báo cáo: Có Phiếu kiểm soát mới</span>
+    </div>
+    <p>
+      Tiếp nhận, kiểm soát, cập nhật và trình HĐTV phiếu kiểm soát chi (Chuyển khoản, tiền mặt).
+    </p>
+    <ul class="revenue-control-list">
+      <li>Hồ sơ đề nghị thanh toán</li>
+      <li>Hồ sơ vốn tự có</li>
+      <li>Ký số nội bộ và trình xử lý</li>
+    </ul>
+    <a class="revenue-control-action" href="/vouchers">Vào xử lý</a>
+  </div>
+
+  <div class="revenue-control-card cash">
+    <div class="revenue-control-icon">💵</div>
+    <div class="revenue-control-title-row">
+      <h3>Kiểm soát thu, chi tiền mặt hàng ngày</h3>
+      <span class="revenue-control-card-badge hvgl-nav-badge" data-badge-key="cash_control" hidden></span>
+      <span class="revenue-control-new-text" data-badge-text-key="cash_control" hidden>Báo cáo: Có Phiếu kiểm soát mới</span>
+    </div>
+    <p>
+      Tổng hợp, đối chiếu dữ liệu HIS, Sổ quỹ tiền mặt và báo cáo Kế toán để lập phiếu kiểm soát thu chi tiền mặt hàng ngày.
+    </p>
+    <ul class="revenue-control-list">
+      <li>Tổng hợp số liệu</li>
+      <li>Đối chiếu số liệu</li>
+      <li>Lập phiếu kiểm soát</li>
+    </ul>
+    <a class="revenue-control-action" href="/cash-control">Vào xử lý</a>
+  </div>
+
+  <div class="revenue-control-card stats">
+    <div class="revenue-control-icon">📊</div>
+    <h3>Thống kê kiểm soát thu, chi</h3>
+    <p>
+      Tổng hợp kết quả kiểm soát theo khoảng thời gian, phục vụ báo cáo nhanh và theo dõi hoạt động kiểm soát nội bộ.
+    </p>
+    <ul class="revenue-control-list">
+      <li>Thống kê theo thời gian: Ngày - Tuần - Tháng - Năm</li>
+      <li>Tổng hợp số chứng từ, số phiếu</li>
+      <li>Xuất báo cáo thống kê</li>
+    </ul>
+    <a class="revenue-control-action" href="/control-statistics">Xem thống kê</a>
+  </div>
+</div>
+{% endblock %}

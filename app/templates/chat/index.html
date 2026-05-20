@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+
+{% block content %}
+<link rel="stylesheet" href="/static/chat/chat.css">
+
+<div class="page-card chat-page">
+  <div class="chat-page-header">
+    <div>
+      <h2 class="chat-page-title">Trao đổi nhóm</h2>
+      <p class="chat-page-subtitle">
+        Phân hệ này được sử dụng để trao đổi công việc theo nhóm.
+      </p>
+    </div>
+  </div>
+
+  {% set chat_error = request.query_params.get('error') %}
+  {% if chat_error %}
+  <div class="chat-room-notice" style="margin-top:16px;padding:12px 14px;border:1px solid #fecaca;background:#fef2f2;color:#b91c1c;border-radius:10px;font-weight:700;">
+    {{ chat_error }}
+  </div>
+  {% elif chat_notice %}
+  <div class="alert-info chat-room-notice" style="margin-top: 16px;">
+    {{ chat_notice }}
+  </div>
+  {% endif %}
+
+  <div class="chat-home-layout">
+    <aside class="chat-home-sidebar">
+      <div class="chat-sidebar-box">
+        <div class="chat-sidebar-top">
+          <div>
+            <div class="chat-sidebar-title">Nhóm chat của tôi</div>
+            <div class="chat-sidebar-subtitle">Quản lý nhóm theo kiểu gọn</div>
+          </div>
+        </div>
+
+        <form method="post" action="/chat/api/groups/create" class="chat-create-form">
+          <input
+            type="text"
+            name="name"
+            class="chat-search-input"
+            placeholder="Nhập tên nhóm mới..."
+            autocomplete="off"
+            required
+          >
+          <button type="submit" class="chat-primary-btn">Tạo nhóm</button>
+        </form>
+
+        <div class="chat-search-wrap">
+          <input
+            type="text"
+            id="groupSearchInput"
+            class="chat-search-input"
+            placeholder="Tìm nhóm chat..."
+            autocomplete="off"
+          >
+        </div>
+
+        <div class="chat-collapsible-box">
+          <button type="button" class="chat-collapsible-toggle" id="homeGroupToggle">
+            <span>Danh sách nhóm</span>
+            <span class="chat-collapsible-meta">
+              {{ groups|length if groups else 0 }} nhóm
+            </span>
+          </button>
+
+          <div class="chat-collapsible-content" id="homeGroupBox">
+            <div class="chat-group-list chat-group-list-home" id="chatGroupList">
+              {% if groups %}
+                {% for g in groups %}
+                <a
+                  href="/chat/{{ g.id }}"
+                  class="chat-group-item"
+                  data-group-name="{{ (g.name or '')|lower }}"
+                >
+                  <div class="chat-group-item-main">
+                    <div class="chat-group-name-row">
+                      <div class="chat-group-name">{{ g.name }}</div>
+                      <div class="chat-group-badges">
+                        <span class="chat-group-badge">{{ g.member_count or 0 }} thành viên</span>
+                        <span
+                          class="chat-group-badge chat-group-badge-new-group {% if not g.has_new_group_badge %}is-hidden{% endif %}"
+                          data-group-id="{{ g.id }}"
+                          data-badge-type="new-group"
+                        >
+                          Nhóm mới
+                        </span>
+                        <span
+                          class="chat-group-badge chat-group-badge-muted chat-unread-badge {% if not (g.new_message_count or 0) %}is-hidden{% endif %}"
+                          data-group-id="{{ g.id }}"
+                          data-badge-type="unread"
+                        >
+                          {{ g.new_message_count or 0 }} mới
+                        </span>
+                      </div>
+                    </div>
+                    <div class="chat-group-meta">Loại nhóm: {{ g.group_type }}</div>
+                  </div>
+                </a>
+                {% endfor %}
+              {% else %}
+                <div class="chat-empty-state chat-empty-sidebar">
+                  Bạn chưa thuộc nhóm chat nào. Có thể tạo nhóm mới ở ô phía trên.
+                </div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <section class="chat-room-card chat-dashboard-card">
+      <div class="chat-dashboard-wrap">
+        <div class="chat-dashboard-header">
+          <div>
+            <div class="chat-dashboard-title">Trao đổi nhóm</div>
+            <div class="chat-dashboard-subtitle">
+              Vào "Danh sách nhóm" để Chọn một nhóm và bắt đầu trao đổi.
+            </div>
+          </div>
+          <div class="chat-dashboard-user">
+            {{ current_user_display_name }}
+          </div>
+        </div>
+
+        <div class="chat-dashboard-body">
+          <div class="chat-dashboard-panel">
+            <div class="chat-dashboard-panel-title">Sử dụng nhanh</div>
+            <ul class="chat-dashboard-list">
+              <li>Tạo nhóm chat mới ở cột bên trái (Không cho phép tạo nhóm trùng tên).</li>
+              <li>Tìm nhanh nhóm theo tên.</li>
+              <li>Chọn nhóm để vào phòng chat.</li>
+            </ul>
+          </div>
+
+          <div class="chat-dashboard-panel">
+            <div class="chat-dashboard-panel-title">Gợi ý hiển thị</div>
+            <ul class="chat-dashboard-list">
+              <li>Mỗi nhóm hiển thị số thành viên và tổng số tin nhắn.</li>
+              <li>Chọn "Danh sách nhóm" để hiển thị tất cả các nhóm.</li>
+              <li>Vùng chat sẽ là khu vực trung tâm khi vào nhóm.</li>
+			  <li>Chọn "Thành viên" để xem danh sách thành viên của nhóm.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script src="/static/chat/chat.js"></script>
+{% endblock %}

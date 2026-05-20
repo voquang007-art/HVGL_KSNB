@@ -1,0 +1,764 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+  .draft-grid{display:grid;grid-template-columns:360px 1fr;gap:18px;align-items:start}
+  .card{background:#fff;border:1px solid #d9e2ec;border-radius:14px;padding:16px;box-shadow:0 8px 24px rgba(15,23,42,.06)}
+  .card h3,.card h4{margin:0 0 12px}
+  .muted{color:#64748b;font-size:13px}
+  .field{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
+  .field input,.field select,.field textarea{padding:10px 12px;border:1px solid #cbd5e1;border-radius:10px;font:inherit}
+  .field textarea{min-height:84px;resize:vertical}
+  .btn-row{display:flex;gap:8px;flex-wrap:wrap}
+  .btn{display:inline-flex;align-items:center;justify-content:center;padding:9px 14px;border-radius:10px;border:1px solid #0f766e;background:#0f766e;color:#fff;text-decoration:none;cursor:pointer;font:inherit}
+  .btn.secondary{background:#fff;color:#0f172a;border-color:#cbd5e1}
+  .btn.warn{background:#b91c1c;border-color:#b91c1c}
+  .btn.gold{background:#92400e;border-color:#92400e}
+  .btn:disabled{opacity:.55;cursor:not-allowed}
+  .table{width:100%;border-collapse:collapse}
+  .table th,.table td{padding:10px 8px;border-bottom:1px solid #e2e8f0;text-align:left;vertical-align:top;font-size:14px}
+  .badge{display:inline-flex;padding:4px 8px;border-radius:999px;background:#ecfeff;color:#155e75;font-size:12px;font-weight:600}
+  .status-finished{background:#dcfce7;color:#166534}
+  .status-return{background:#fee2e2;color:#991b1b}
+  .status-review{background:#fef3c7;color:#92400e}
+  .status-approved{background:#dbeafe;color:#1d4ed8}
+  .list-link{display:block;padding:10px 12px;border:1px solid #e2e8f0;border-radius:12px;text-decoration:none;color:#0f172a;margin-bottom:10px}
+  .list-link.active{border-color:#0f766e;background:#f0fdfa}
+  .mini{font-size:12px;color:#64748b}
+  .history{display:grid;gap:12px}
+  .history-item{border-left:4px solid #cbd5e1;padding:10px 12px;background:#f8fafc;border-radius:0 12px 12px 0}
+  .coord-list{display:grid;gap:8px}
+  .file-line{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .inline-form{display:inline}
+  .section-title{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:10px}
+  .notice{padding:10px 12px;border-radius:12px;background:#f8fafc;border:1px solid #e2e8f0;color:#334155;font-size:13px;line-height:1.45}
+  .draft-realtime-notice{position:sticky;top:10px;z-index:80;margin-bottom:14px;border-color:#86efac;background:#f0fdf4;color:#166534}
+  @media (max-width: 1100px){.draft-grid{grid-template-columns:1fr}}
+
+  .multi-select-wrap{position:relative}
+  .multi-select-trigger{
+    width:100%;
+    min-height:46px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    padding:10px 12px;
+    border:1px solid #cbd5e1;
+    border-radius:12px;
+    background:#fff;
+    cursor:pointer;
+    transition:.18s ease;
+    box-sizing:border-box;
+  }
+  .multi-select-trigger:hover{
+    border-color:#94a3b8;
+    box-shadow:0 2px 10px rgba(15,23,42,.05);
+  }
+  .multi-select-wrap.open .multi-select-trigger{
+    border-color:#0f766e;
+    box-shadow:0 0 0 3px rgba(15,118,110,.12);
+  }
+  .multi-select-placeholder{color:#64748b;font-size:14px}
+  .multi-select-summary{display:flex;flex-wrap:wrap;gap:6px;align-items:center;flex:1}
+  .multi-select-chip{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    padding:5px 10px;
+    border-radius:999px;
+    background:#ecfeff;
+    color:#155e75;
+    font-size:12px;
+    font-weight:600;
+    border:1px solid #bae6fd;
+    max-width:100%;
+  }
+  .multi-select-chip.more{background:#f1f5f9;color:#334155;border-color:#cbd5e1}
+  .multi-select-caret{flex:0 0 auto;color:#475569;font-size:12px;transition:transform .18s ease}
+  .multi-select-wrap.open .multi-select-caret{transform:rotate(180deg)}
+  .multi-select-dropdown{
+    position:absolute;
+    top:calc(100% + 8px);
+    left:0;
+    right:0;
+    z-index:50;
+    display:none;
+    background:#fff;
+    border:1px solid #dbe2ea;
+    border-radius:14px;
+    box-shadow:0 14px 30px rgba(15,23,42,.14);
+    overflow:hidden;
+  }
+  .multi-select-wrap.open .multi-select-dropdown{display:block}
+  .multi-select-toolbar{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:8px;
+    padding:10px 12px;
+    border-bottom:1px solid #e2e8f0;
+    background:#f8fafc;
+  }
+  .multi-select-toolbar .mini-actions{display:flex;gap:8px;flex-wrap:wrap}
+  .multi-select-toolbar button{
+    padding:6px 10px;
+    border-radius:8px;
+    border:1px solid #cbd5e1;
+    background:#fff;
+    color:#0f172a;
+    cursor:pointer;
+    font:inherit;
+    font-size:12px;
+  }
+  .multi-select-toolbar button:hover{background:#f8fafc}
+  .multi-select-search{padding:10px 12px;border-bottom:1px solid #e2e8f0;background:#fff}
+  .multi-select-search input{
+    width:100%;
+    box-sizing:border-box;
+    padding:9px 11px;
+    border:1px solid #cbd5e1;
+    border-radius:10px;
+    font:inherit;
+  }
+  .multi-select-options{max-height:280px;overflow:auto;padding:6px;background:#fff}
+  .multi-select-option{
+    display:flex;
+    align-items:flex-start;
+    gap:10px;
+    padding:10px 12px;
+    border-radius:10px;
+    cursor:pointer;
+    transition:.15s ease;
+    border:1px solid transparent;
+  }
+  .multi-select-option:hover{background:#f8fafc;border-color:#e2e8f0}
+  .multi-select-option input[type="checkbox"]{margin-top:2px;width:16px;height:16px;flex:0 0 auto}
+  .multi-select-option-text{display:flex;flex-direction:column;gap:2px;min-width:0}
+  .multi-select-option-title{font-size:14px;font-weight:600;color:#0f172a;word-break:break-word}
+  .multi-select-option-sub{font-size:12px;color:#64748b}
+  .multi-select-empty{padding:14px 12px;color:#64748b;font-size:13px;text-align:center}
+  .multi-select-note{margin-top:6px;color:#64748b;font-size:12px;line-height:1.5}
+  .hidden-recipient-inputs{display:none}
+</style>
+
+{% set msg = request.query_params.get('msg') %}
+{% set err = request.query_params.get('error') %}
+{% if msg %}<div class="card" style="margin-bottom:14px;border-color:#86efac;background:#f0fdf4;color:#166534;">{{ msg }}</div>{% endif %}
+{% if err %}<div class="card" style="margin-bottom:14px;border-color:#fecaca;background:#fef2f2;color:#991b1b;">{{ err }}</div>{% endif %}
+
+<div class="draft-grid">
+  <section class="card">
+    <h3>Phê duyệt dự thảo văn bản</h3>
+    <div class="muted" style="margin-bottom:12px;">
+      Luồng xử lý: Nhân viên Ban KSNB → Trưởng/Phó Ban KSNB → HĐTV. Trưởng/Phó Ban có thể kết thúc luồng tại cấp Ban KSNB; HĐTV thực hiện phê duyệt.
+    </div>
+
+    <form method="get" action="/draft-approvals" class="field" style="margin-bottom:14px;">
+      <label>Lọc danh sách</label>
+      <select name="status" onchange="this.form.submit()">
+        {% for value,label in status_options %}
+          <option value="{{ value }}" {% if value == selected_status %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </form>
+
+    <div style="max-height:420px;overflow:auto;margin-bottom:14px;">
+      {% for row in draft_rows %}
+        {% set status_class = 'status-review' %}
+        {% if row.status == 'FINISHED' %}{% set status_class = 'status-finished' %}{% endif %}
+        {% if row.status == 'APPROVED' %}{% set status_class = 'status-approved' %}{% endif %}
+        {% if row.status == 'RETURNED_FOR_EDIT' %}{% set status_class = 'status-return' %}{% endif %}
+        <a class="list-link {% if row.id == selected_id %}active{% endif %}" href="/draft-approvals?status={{ selected_status }}&selected_id={{ row.id }}">
+          <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start;">
+            <strong>{{ row.title }}</strong>
+            <span class="badge {{ status_class }}">{{ row.status_label }}</span>
+          </div>
+          <div class="mini" style="margin-top:6px;">{{ row.document_type or 'Dự thảo văn bản' }} • {{ row.created_unit_name or 'Ban KSNB' }}</div>
+          <div class="mini" style="margin-top:4px;">Người tạo: {{ row.creator_name }} | Đang giữ: {{ row.handler_name or '—' }}</div>
+          <div class="mini" style="margin-top:4px;">Phối hợp chờ phản hồi: {{ row.pending_coord_count }}</div>
+          {% if row.active_file %}
+            <div class="mini" style="margin-top:4px;">Tài liệu hiện hành: {{ row.active_file.file_name }}</div>
+          {% endif %}
+        </a>
+      {% else %}
+        <div class="muted">Chưa có hồ sơ nào trong phạm vi hiển thị.</div>
+      {% endfor %}
+    </div>
+
+    {% if can_create_draft %}
+    <h4>Tạo hồ sơ mới</h4>
+    <form method="post" action="/draft-approvals/create" enctype="multipart/form-data">
+      <div class="field">
+        <label>Trích yếu / tiêu đề</label>
+        <input type="text" name="title" required>
+      </div>
+      <div class="field">
+        <label>Loại văn bản</label>
+        <input type="text" name="document_type" value="Dự thảo văn bản">
+      </div>
+      <div class="field">
+        <label>Mô tả ngắn</label>
+        <textarea name="summary" placeholder="Nhập nội dung tóm tắt hoặc ghi chú ban đầu."></textarea>
+      </div>
+      <div class="field">
+        <label>Upload tài liệu dự thảo</label>
+        <input type="file" name="upfile" required>
+        <div class="mini">Hỗ trợ: PDF, Word, Excel, PowerPoint, ảnh, TXT.</div>
+      </div>
+      <button class="btn" type="submit">Tạo hồ sơ</button>
+    </form>
+    {% else %}
+    <div class="notice">
+      Tài khoản hiện tại không thuộc nhóm được tạo hồ sơ dự thảo. Anh/chị chỉ xem và xử lý các hồ sơ được phân công.
+    </div>
+    {% endif %}
+  </section>
+
+  <section>
+    {% if selected_detail %}
+      {% set d = selected_detail.draft %}
+      <div class="card">
+        <div class="section-title">
+          <div>
+            <h3>{{ d.title }}</h3>
+            <div class="muted">{{ d.document_type or 'Dự thảo văn bản' }} • Trạng thái: {{ selected_detail.status_label }}</div>
+          </div>
+          <span class="badge">{{ selected_detail.status_label }}</span>
+        </div>
+
+        {% if d.summary %}
+        <div class="notice" style="margin-bottom:12px;">
+          {{ d.summary }}
+        </div>
+        {% endif %}
+
+        <table class="table">
+          <tr>
+            <th style="width:180px;">Người tạo</th>
+            <td>{{ d.creator.full_name or d.creator.username if d.creator else '—' }}</td>
+          </tr>
+          <tr>
+            <th>Người đang xử lý</th>
+            <td>{{ d.current_handler.full_name or d.current_handler.username if d.current_handler else '—' }}</td>
+          </tr>
+          <tr>
+            <th>Ngày tạo</th>
+            <td>{{ d.created_at|format_vn_dt }}</td>
+          </tr>
+          <tr>
+            <th>Cập nhật cuối</th>
+            <td>{{ d.updated_at|format_vn_dt }}</td>
+          </tr>
+        </table>
+
+        {% if selected_detail.active_file %}
+        <div style="margin-top:14px;">
+          <h4>Tài liệu hiện hành</h4>
+          <div class="file-line">
+            <strong>{{ selected_detail.active_file.file_name }}</strong>
+            <span class="mini">{{ selected_detail.active_file.file_role_label }}</span>
+            <a class="btn secondary" href="{{ selected_detail.active_file.preview_url }}" target="_blank">Xem</a>
+            <a class="btn secondary" href="/draft-approvals/files/{{ selected_detail.active_file.id }}/download">Tải</a>
+          </div>
+        </div>
+        {% endif %}
+      </div>
+
+      {% if selected_detail.pending_coord %}
+      <div class="card" style="margin-top:16px;background:#fff7ed;">
+        <h4>Yêu cầu phối hợp đang chờ phản hồi</h4>
+        {% for a in selected_detail.pending_coord %}
+          <div class="history-item" style="margin-bottom:10px;border-left-color:#fb923c;">
+            <div>
+              <strong>{{ a.from_user.full_name or a.from_user.username if a.from_user else 'Người gửi' }}</strong>
+              đề nghị phối hợp lúc {{ a.created_at|format_vn_dt }}
+            </div>
+            <div class="mini" style="margin:4px 0 8px;">{{ a.comment or '—' }}</div>
+            <form method="post" action="/draft-approvals/{{ d.id }}/coordinate-reply/{{ a.id }}">
+              <div class="field">
+                <textarea name="response_text" placeholder="Nhập ý kiến phối hợp." required></textarea>
+              </div>
+              <button class="btn gold" type="submit">Gửi phản hồi phối hợp</button>
+            </form>
+          </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {% if selected_detail.can_edit %}
+      <div class="card" style="margin-top:16px;">
+        <h4>Cập nhật tài liệu dự thảo</h4>
+        <form method="post" action="/draft-approvals/{{ d.id }}/upload" enctype="multipart/form-data">
+          <div class="field">
+            <label>Ghi chú cập nhật</label>
+            <textarea name="comment" placeholder="Nêu nội dung đã cập nhật, nếu có."></textarea>
+          </div>
+          <div class="field">
+            <label>Upload tài liệu thay thế</label>
+            <input type="file" name="upfile" required>
+          </div>
+          <button class="btn secondary" type="submit">Cập nhật tài liệu</button>
+        </form>
+      </div>
+
+      <div class="card" style="margin-top:16px;">
+        <h4>Trình duyệt</h4>
+        <form method="post" action="/draft-approvals/{{ d.id }}/submit">
+          <div class="field">
+            <label>Người nhận</label>
+            <select name="recipient_id" required>
+              <option value="">-- Chọn Trưởng/Phó Ban KSNB --</option>
+              {% for item in selected_detail.submit_candidates %}
+                {% set u = item.user %}
+                <option value="{{ u.id }}">{{ item.display_label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="field">
+            <label>Ghi chú khi trình</label>
+            <textarea name="comment" placeholder="Có thể để trống nếu không có ghi chú thêm."></textarea>
+          </div>
+          <button class="btn" type="submit">Trình dự thảo</button>
+        </form>
+      </div>
+      {% endif %}
+
+      {% if selected_detail.can_approve_forward %}
+      <div class="card" style="margin-top:16px;">
+        <h4>Xử lý hồ sơ</h4>
+
+        <form method="post" action="/draft-approvals/{{ d.id }}/approve" style="margin-bottom:14px;">
+          {% if selected_detail.is_ksnb_manager_handler %}
+          <div class="field">
+            <label>Người nhận HĐTV</label>
+            <select name="recipient_id" required>
+              <option value="">-- Chọn Tổng Giám đốc / Phó Tổng Giám đốc --</option>
+              {% for item in selected_detail.submit_candidates %}
+                {% set u = item.user %}
+                <option value="{{ u.id }}">{{ item.display_label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          {% endif %}
+
+          <div class="field">
+            <label>Ý kiến</label>
+            <textarea name="comment" placeholder="Ý kiến đồng ý / ghi chú khi trình tiếp hoặc phê duyệt."></textarea>
+          </div>
+
+          <button class="btn" type="submit">
+            {% if selected_detail.is_hdtv_handler %}
+              Phê duyệt
+            {% else %}
+              Đồng ý và trình HĐTV
+            {% endif %}
+          </button>
+        </form>
+
+        {% if selected_detail.can_finish %}
+        <form method="post" action="/draft-approvals/{{ d.id }}/finish" style="margin-bottom:14px;">
+          <div class="field">
+            <label>Ý kiến khi kết thúc luồng tại Ban KSNB</label>
+            <textarea name="comment" placeholder="Có thể để trống nếu không có ghi chú thêm."></textarea>
+          </div>
+          <button class="btn gold" type="submit">Kết thúc luồng tại Ban KSNB</button>
+        </form>
+        {% endif %}
+
+        <form method="post" action="/draft-approvals/{{ d.id }}/return" style="margin-bottom:14px;">
+          <div class="field">
+            <label>Ý kiến sửa đổi, bổ sung</label>
+            <textarea name="comment" required placeholder="Bắt buộc nhập ý kiến khi trả lại hồ sơ."></textarea>
+          </div>
+          <button class="btn warn" type="submit">Trả lại để người trình tự sửa</button>
+        </form>
+
+        <form method="post" action="/draft-approvals/{{ d.id }}/return-edited" enctype="multipart/form-data">
+          <div class="field">
+            <label>Ý kiến sửa đổi, bổ sung</label>
+            <textarea name="comment" required placeholder="Nêu rõ các nội dung đã chỉnh trực tiếp trong file."></textarea>
+          </div>
+          <div class="field">
+            <label>Upload tài liệu đã sửa</label>
+            <input type="file" name="upfile" required>
+          </div>
+          <button class="btn warn" type="submit">Trả lại kèm file đã sửa</button>
+        </form>
+      </div>
+      {% endif %}
+
+      {% if selected_detail.coord_candidates %}
+      <div class="card" style="margin-top:16px;">
+        <h4>Gửi phối hợp</h4>
+        <form method="post" action="/draft-approvals/{{ d.id }}/coordinate" class="coord-multiselect-form">
+          <div class="field">
+            <label>Người nhận phối hợp</label>
+
+            <div class="multi-select-wrap" data-multiselect>
+              <button type="button" class="multi-select-trigger" data-multiselect-trigger aria-expanded="false">
+                <div class="multi-select-summary" data-multiselect-summary>
+                  <span class="multi-select-placeholder">Chọn người phối hợp...</span>
+                </div>
+                <span class="multi-select-caret">▼</span>
+              </button>
+
+              <div class="multi-select-dropdown" data-multiselect-dropdown>
+                <div class="multi-select-toolbar">
+                  <div class="mini">Có thể chọn nhiều người</div>
+                  <div class="mini-actions">
+                    <button type="button" data-select-all>Chọn tất cả</button>
+                    <button type="button" data-clear-all>Bỏ chọn</button>
+                  </div>
+                </div>
+
+                <div class="multi-select-search">
+                  <input type="text" placeholder="Tìm nhanh người phối hợp..." data-multiselect-search>
+                </div>
+
+                <div class="multi-select-options" data-multiselect-options>
+                  {% for user in selected_detail.coord_candidates %}
+                    <label class="multi-select-option" data-option-label data-option-text="{{ (user.full_name or user.username or '')|lower }}">
+                      <input type="checkbox"
+                             value="{{ user.id }}"
+                             data-recipient-checkbox>
+                      <div class="multi-select-option-text">
+                        <span class="multi-select-option-title">{{ user.full_name or user.username }}</span>
+                        <span class="multi-select-option-sub">{{ user.position_title or 'Người phối hợp hợp lệ' }}</span>
+                      </div>
+                    </label>
+                  {% endfor %}
+                </div>
+              </div>
+
+              <div class="hidden-recipient-inputs" data-hidden-recipient-inputs></div>
+            </div>
+            <div class="multi-select-note">Chức năng phối hợp không làm đổi người xử lý chính của hồ sơ.</div>
+          </div>
+
+          <div class="field">
+            <label>Nội dung đề nghị phối hợp</label>
+            <textarea name="comment" placeholder="Nhập nội dung cần phối hợp."></textarea>
+          </div>
+
+          <button class="btn gold" type="submit">Gửi phối hợp</button>
+        </form>
+      </div>
+      {% endif %}
+
+      <div class="card" style="margin-top:16px;">
+        <h4>Danh sách tài liệu</h4>
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Tệp</th>
+              <th>Loại</th>
+              <th>Người upload</th>
+              <th>Thời điểm</th>
+              <th>Thao tác</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for f in selected_detail.files %}
+            <tr>
+              <td>{{ f.file_name }}</td>
+              <td>{{ f.file_role_label }}</td>
+              <td>{{ f.uploaded_by.full_name or f.uploaded_by.username if f.uploaded_by else '—' }}</td>
+              <td>{{ f.uploaded_at|format_vn_dt }}</td>
+              <td>
+                <a class="btn secondary" href="{{ f.preview_url }}" target="_blank">Xem</a>
+                <a class="btn secondary" href="/draft-approvals/files/{{ f.id }}/download">Tải</a>
+              </td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="5" class="muted">Chưa có tài liệu.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card" style="margin-top:16px;">
+        <h4>Lịch sử xử lý</h4>
+        <div class="history">
+          {% for a in selected_detail.actions %}
+          <div class="history-item">
+            <div>
+              <strong>{{ a.action_label }}</strong>
+              <span class="mini"> • {{ a.created_at|format_vn_dt }}</span>
+            </div>
+            <div class="mini" style="margin-top:4px;">
+              Từ:
+              <strong>{{ a.from_user.full_name or a.from_user.username if a.from_user else '—' }}</strong>
+              →
+              Đến:
+              <strong>{{ a.to_user.full_name or a.to_user.username if a.to_user else '—' }}</strong>
+            </div>
+            {% if a.comment %}
+            <div style="margin-top:6px;">{{ a.comment }}</div>
+            {% endif %}
+            {% if a.response_text %}
+            <div style="margin-top:6px;">
+              <strong>Phản hồi:</strong> {{ a.response_text }}
+              <span class="mini">({{ a.responded_at|format_vn_dt }})</span>
+            </div>
+            {% endif %}
+            {% if a.linked_file %}
+            <div class="file-line" style="margin-top:8px;">
+              <span class="mini">Tệp liên quan:</span>
+              <strong>{{ a.linked_file.file_name }}</strong>
+              <a class="btn secondary" href="{{ a.linked_file.preview_url }}" target="_blank">Xem</a>
+              <a class="btn secondary" href="/draft-approvals/files/{{ a.linked_file.id }}/download">Tải</a>
+            </div>
+            {% endif %}
+          </div>
+          {% else %}
+          <div class="muted">Chưa có lịch sử xử lý.</div>
+          {% endfor %}
+        </div>
+      </div>
+
+    {% else %}
+      <div class="card">
+        <h3>Chưa chọn hồ sơ</h3>
+        <div class="muted">Chọn một hồ sơ ở danh sách bên trái để xem chi tiết hoặc tạo hồ sơ mới.</div>
+      </div>
+    {% endif %}
+  </section>
+</div>
+
+<script>
+(function () {
+  function textOf(cb) {
+    var label = cb.closest("[data-option-label]");
+    if (!label) return cb.value || "";
+    var title = label.querySelector(".multi-select-option-title");
+    return title ? title.textContent.trim() : (cb.value || "");
+  }
+
+  function updateSummary(summary, checked) {
+    if (!summary) return;
+
+    summary.innerHTML = "";
+
+    if (!checked.length) {
+      var span = document.createElement("span");
+      span.className = "multi-select-placeholder";
+      span.textContent = "Chọn người phối hợp...";
+      summary.appendChild(span);
+      return;
+    }
+
+    checked.slice(0, 3).forEach(function (cb) {
+      var chip = document.createElement("span");
+      chip.className = "multi-select-chip";
+      chip.textContent = textOf(cb);
+      summary.appendChild(chip);
+    });
+
+    if (checked.length > 3) {
+      var more = document.createElement("span");
+      more.className = "multi-select-chip more";
+      more.textContent = "+" + (checked.length - 3);
+      summary.appendChild(more);
+    }
+  }
+
+  function createHiddenInputs(hiddenInputs, values) {
+    if (!hiddenInputs) return;
+    hiddenInputs.innerHTML = "";
+    values.forEach(function (value) {
+      var input = document.createElement("input");
+      input.type = "hidden";
+      input.name = "recipient_ids";
+      input.value = value;
+      hiddenInputs.appendChild(input);
+    });
+  }
+
+  function filterOptions(searchInput, optionLabels) {
+    var keyword = String(searchInput.value || "").trim().toLowerCase();
+    optionLabels.forEach(function (label) {
+      var text = String(label.getAttribute("data-option-text") || label.textContent || "").toLowerCase();
+      label.style.display = !keyword || text.indexOf(keyword) >= 0 ? "" : "none";
+    });
+  }
+
+  function initMultiSelect(root) {
+    if (!root) return;
+
+    var trigger = root.querySelector("[data-multiselect-trigger]");
+    var summary = root.querySelector("[data-multiselect-summary]");
+    var searchInput = root.querySelector("[data-multiselect-search]");
+    var hiddenInputs = root.querySelector("[data-hidden-recipient-inputs]");
+    var checkboxes = Array.prototype.slice.call(root.querySelectorAll("[data-recipient-checkbox]"));
+    var optionLabels = Array.prototype.slice.call(root.querySelectorAll("[data-option-label]"));
+    var btnSelectAll = root.querySelector("[data-select-all]");
+    var btnClearAll = root.querySelector("[data-clear-all]");
+    var form = root.closest("form");
+
+    function getChecked() {
+      return checkboxes.filter(function (cb) { return cb.checked; });
+    }
+
+    function syncAll() {
+      var checked = getChecked();
+      updateSummary(summary, checked);
+      createHiddenInputs(hiddenInputs, checked.map(function (cb) { return cb.value; }));
+    }
+
+    function openDropdown() {
+      root.classList.add("open");
+      if (trigger) trigger.setAttribute("aria-expanded", "true");
+      if (searchInput) {
+        window.setTimeout(function () {
+          searchInput.focus();
+        }, 30);
+      }
+    }
+
+    function closeDropdown() {
+      root.classList.remove("open");
+      if (trigger) trigger.setAttribute("aria-expanded", "false");
+    }
+
+    if (trigger) {
+      trigger.addEventListener("click", function (e) {
+        e.preventDefault();
+        if (root.classList.contains("open")) {
+          closeDropdown();
+        } else {
+          openDropdown();
+        }
+      });
+    }
+
+    checkboxes.forEach(function (cb) {
+      cb.addEventListener("change", syncAll);
+    });
+
+    if (btnSelectAll) {
+      btnSelectAll.addEventListener("click", function (e) {
+        e.preventDefault();
+        optionLabels.forEach(function (label) {
+          if (label.style.display === "none") return;
+          var cb = label.querySelector("[data-recipient-checkbox]");
+          if (cb) cb.checked = true;
+        });
+        syncAll();
+      });
+    }
+
+    if (btnClearAll) {
+      btnClearAll.addEventListener("click", function (e) {
+        e.preventDefault();
+        checkboxes.forEach(function (cb) { cb.checked = false; });
+        syncAll();
+      });
+    }
+
+    if (searchInput) {
+      searchInput.addEventListener("input", function () {
+        filterOptions(searchInput, optionLabels);
+      });
+    }
+
+    document.addEventListener("click", function (e) {
+      if (!root.contains(e.target)) {
+        closeDropdown();
+      }
+    });
+
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") {
+        closeDropdown();
+      }
+    });
+
+    if (form) {
+      form.addEventListener("submit", function (e) {
+        syncAll();
+        if (!getChecked().length) {
+          e.preventDefault();
+          alert("Anh/chị chưa chọn người nhận phối hợp.");
+          openDropdown();
+        }
+      });
+    }
+
+    syncAll();
+  }
+
+  document.querySelectorAll("[data-multiselect]").forEach(initMultiSelect);
+
+  function handleDraftFinishedRealtime(payload) {
+    if (!payload || payload.module !== "draft" || payload.type !== "draft_finished") return;
+
+    var draftId = String(payload.draft_id || "");
+    if (!draftId) return;
+
+    var dedupeKey = "draft_finished:" + draftId + ":" + String(payload.timestamp || "");
+    window.__draftApprovalRealtimeHandled = window.__draftApprovalRealtimeHandled || {};
+    if (window.__draftApprovalRealtimeHandled[dedupeKey]) return;
+    window.__draftApprovalRealtimeHandled[dedupeKey] = true;
+
+    var selectedId = "{{ selected_id or '' }}";
+    var status = "{{ selected_status or '' }}";
+    var targetUrl = "/draft-approvals?selected_id=" + encodeURIComponent(draftId)
+      + "&msg=" + encodeURIComponent("Hồ sơ đã được kết thúc luồng tại Ban KSNB.");
+    if (status) {
+      targetUrl += "&status=" + encodeURIComponent(status);
+    }
+
+    var notice = document.createElement("div");
+    notice.className = "card draft-realtime-notice";
+    notice.innerHTML = "Hồ sơ dự thảo đã được kết thúc luồng tại Ban KSNB. "
+      + "<a href=\"" + targetUrl + "\" style=\"font-weight:700;color:#166534;text-decoration:underline;\">Bấm để cập nhật ngay</a>.";
+
+    var grid = document.querySelector(".draft-grid");
+    if (grid && grid.parentNode) {
+      grid.parentNode.insertBefore(notice, grid);
+    }
+
+    if (!selectedId || selectedId === draftId) {
+      window.setTimeout(function () {
+        window.location.href = targetUrl;
+      }, 700);
+    }
+  }
+
+  function parseRealtimePayload(raw) {
+    if (!raw) return null;
+    if (raw.module || raw.type) return raw;
+    if (raw.detail) return parseRealtimePayload(raw.detail);
+    if (raw.data) {
+      try {
+        return typeof raw.data === "string" ? JSON.parse(raw.data) : raw.data;
+      } catch (err) {
+        return null;
+      }
+    }
+    return null;
+  }
+
+  ["hvgl:notify", "hvgl:realtime", "hvgl:page-soft-refresh-needed", "draft:realtime"].forEach(function (eventName) {
+    window.addEventListener(eventName, function (event) {
+      handleDraftFinishedRealtime(parseRealtimePayload(event));
+    });
+  });
+
+  if (!window.__draftApprovalNotifySocketStarted && "WebSocket" in window) {
+    window.__draftApprovalNotifySocketStarted = true;
+    try {
+      var protocol = window.location.protocol === "https:" ? "wss" : "ws";
+      var socket = new WebSocket(protocol + "://" + window.location.host + "/ws/chat/notify");
+      socket.addEventListener("message", function (event) {
+        handleDraftFinishedRealtime(parseRealtimePayload(event));
+      });
+    } catch (err) {
+      console.warn("Không khởi tạo được realtime riêng cho Phê duyệt dự thảo văn bản.", err);
+    }
+  }
+})();
+</script>
+{% endblock %}

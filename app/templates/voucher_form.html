@@ -1,0 +1,114 @@
+{% extends 'base.html' %}
+{% block content %}
+<style>
+  .voucher-title-font {
+    font-family: inherit;
+    font-weight: 700;
+  }
+
+  .voucher-import-emphasis {
+    color: #b77900;
+    font-weight: 700;
+  }
+</style>
+<div class="page-head">
+  <h2>{{ 'Sửa Phiếu kiểm soát' if is_edit else 'Lập Phiếu kiểm soát' }}</h2>
+  <a class="secondary-link" href="javascript:history.back()">Back</a>
+</div>
+{% if error %}<div class="alert">{{ error }}</div>{% endif %}
+<div class="alert">
+  Có thể lưu nháp khi chưa chọn file Excel, đã chọn một phần file Excel, đã chọn đủ file Excel hoặc đã gần hoàn thiện Phiếu. Khi sẵn sàng, mở lại Phiếu nháp để trình ký số hoặc trình theo hình thức không ký số.
+</div>
+<form method="post" action="{{ form_action or '/vouchers/new' }}" enctype="multipart/form-data" class="form-grid">
+  <section class="panel">
+    <h3>I. Thông tin chung</h3>
+    <div class="grid2">
+      <div><label>Tên hồ sơ/khoản thu, chi</label><input name="title" value="{{ voucher.title if voucher else '' }}" required></div>
+      <div>
+        <label>Loại hồ sơ</label>
+        <select name="ho_so_type">
+          <option value="CHI" {% if voucher and voucher['hồ_so_type'] == 'CHI' %}selected{% endif %}>Chi quan trọng</option>
+          <option value="THU" {% if voucher and voucher['hồ_so_type'] == 'THU' %}selected{% endif %}>Thu quan trọng</option>
+        </select>
+      </div>
+      <div><label>Số tiền tổng</label><input name="total_amount" type="number" step="1" value="{{ voucher.total_amount if voucher else 0 }}"></div>
+      <div><label>Đơn vị lập hồ sơ</label><input name="submitting_unit" value="{{ voucher.submitting_unit if voucher else '' }}"></div>
+      <div><label>Người giao hồ sơ</label><input name="sender_name" value="{{ voucher.sender_name if voucher else '' }}"></div>
+      <div><label>Ngày tiếp nhận hồ sơ tại Ban Kiểm soát nội bộ</label><input name="received_at" type="datetime-local" value="{{ received_at_default or '' }}"></div>
+      <div>
+        <label>Hình thức trình phê duyệt</label>
+        <select name="approval_target">
+          <option {% if voucher and voucher.approval_target == 'Trình Hội đồng thành viên' %}selected{% endif %}>Trình Hội đồng thành viên</option>
+          <option {% if voucher and voucher.approval_target == 'Trình Chủ tịch Hội đồng thành viên' %}selected{% endif %}>Trình Chủ tịch Hội đồng thành viên</option>
+        </select>
+      </div>
+      <div>
+        <label>Luồng trình</label>
+        <select name="route_mode">
+          <option value="THROUGH_HEAD" {% if not voucher or voucher.route_mode == 'THROUGH_HEAD' %}selected{% endif %}>Nhân viên → Trưởng ban → HĐTV</option>
+          <option value="DIRECT_BOARD" {% if voucher and voucher.route_mode == 'DIRECT_BOARD' %}selected{% endif %}>Không trình Trưởng ban → HĐTV</option>
+        </select>
+      </div>
+      <div>
+        <label>Chọn Trưởng/Phó Trưởng ban nhận trình</label>
+        <select name="head_user_id">
+          <option value="">-- Chọn khi trình qua Trưởng ban --</option>
+          {% for h in heads %}
+          <option value="{{ h.id }}" {% if voucher and voucher.current_handler == h.id %}selected{% endif %}>{{ h.full_name }} - {{ h.position_title }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h3>II. Nội dung kiểm soát trước</h3>
+    <div class="checks">
+      {% for item in review_items %}
+      <label><input type="checkbox" name="review_items" value="{{ item }}" {% if item in selected_review_items %}checked{% endif %}> {{ item }}</label>
+      {% endfor %}
+    </div>
+  </section>
+
+  {% if not is_edit %}
+  <section class="panel">
+    <h3>III. Import Excel tạo danh mục hồ sơ</h3>
+    <div class="grid2">
+      <div><label>Import bảng kê ĐNTT</label><input type="file" name="dntt_file" accept=".xlsx"></div>
+      <div><label class="voucher-import-emphasis">Import danh sách vốn tự có</label><input type="file" name="von_tu_co_file" accept=".xlsx"></div>
+      <div><label class="voucher-import-emphasis">Import Sổ THCN phải trả nhà cung cấp (Thực hiện khi kiểm soát chi vốn tự có)</label><input type="file" name="thcn_payable_file" accept=".xlsx"></div>
+    </div>
+  </section>
+  {% else %}
+  <section class="panel">
+    <h3>III. Chọn lại file Excel đã import</h3>
+    <div class="alert">
+      Để trống nếu không thay đổi file đã import. Chỉ chọn file mới khi cần thay thế dữ liệu đã import trước đó.
+    </div>
+    <div class="grid2">
+      <div>
+        <label>Chọn lại bảng kê ĐNTT</label>
+        <input type="file" name="dntt_file" accept=".xlsx">
+        <p class="muted">File hiện tại: {{ latest_import_files.get('DNTT', 'Chưa có') if latest_import_files else 'Chưa có' }}</p>
+      </div>
+      <div>
+        <label class="voucher-import-emphasis">Chọn lại danh sách vốn tự có</label>
+        <input type="file" name="von_tu_co_file" accept=".xlsx">
+        <p class="muted">File hiện tại: {{ latest_import_files.get('VON_TU_CO', 'Chưa có') if latest_import_files else 'Chưa có' }}</p>
+      </div>
+      <div>
+        <label class="voucher-import-emphasis">Chọn lại Sổ THCN phải trả nhà cung cấp (Thực hiện đồng thời khi chọn import lại file danh sách vốn tự có</label>
+        <input type="file" name="thcn_payable_file" accept=".xlsx">
+        <p class="muted">File hiện tại: {{ latest_import_files.get('THCN_PAYABLE', 'Chưa có') if latest_import_files else 'Chưa có' }}</p>
+      </div>
+    </div>
+    <div class="alert">
+      Nếu chọn lại ĐNTT hoặc Vốn tự có, ứng dụng sẽ xóa và tạo lại toàn bộ Mục III từ ĐNTT + Vốn tự có. Các nội dung Mục IV, V, VI đã nhập trước đó được giữ nguyên nếu không có trường tương ứng gửi lên form.
+      Nếu chỉ chọn lại Sổ THCN phải trả, ứng dụng không đụng Mục III và chỉ sinh lại bảng cảnh báo công nợ.
+    </div>
+  </section>
+  {% endif %}
+
+  <button class="primary voucher-title-font" type="submit">{{ submit_label or 'Lưu nháp' }}</button>
+</form>
+{% endblock %}

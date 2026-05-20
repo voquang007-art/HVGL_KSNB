@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <title>{{ voucher.code }} - Phiếu kiểm soát</title>
+  <style>
+    @page { size: A4 portrait; margin: 12mm 10mm; }
+    body { font-family: "Times New Roman", serif; color:#000; font-size:14px; line-height:1.35; }
+    .toolbar { position:sticky; top:0; background:#fff; padding:8px; border-bottom:1px solid #ddd; margin-bottom:12px; }
+    .toolbar button,
+    .toolbar a {
+      display:inline-block;
+      padding:8px 14px;
+      font-weight:bold;
+      font-family:inherit;
+      font-size:14px;
+      color:#000;
+      background:#f3f4f6;
+      border:1px solid #999;
+      border-radius:4px;
+      text-decoration:none;
+      cursor:pointer;
+    }
+    .sheet { max-width: 980px; margin:0 auto; }
+    .header {
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:18px;
+      align-items:start;
+      margin-bottom:12px;
+      transform:translateX(-12mm);
+    }
+    .head-block { min-height:92px; }
+    .left-head { display:flex; align-items:flex-start; justify-content:center; gap:8px; padding-top:0; }
+    .left-text { text-align:center; }
+    .right-head { text-align:center; padding-top:0; }
+    .logo { width:46px; height:46px; object-fit:contain; flex:0 0 46px; margin-top:0; opacity:.78; }
+    .center { text-align:center; }
+    .bold { font-weight:bold; }
+    .company-name { font-weight:bold; text-transform:uppercase; line-height:1.25; }
+    .unit-name { font-weight:bold; text-transform:uppercase; line-height:1.25; margin-top:2px; }
+    .national-name { font-weight:bold; text-transform:uppercase; line-height:1.25; }
+    .motto { font-weight:bold; line-height:1.25; margin-top:2px; }
+    .head-underline { width:118px; border-bottom:1.5px solid #000; margin:5px auto 0 auto; }
+    .date-line { margin-top:14px; font-style:italic; }
+    .title { text-align:center; font-weight:bold; font-size:17px; text-transform:uppercase; margin:18px 0 12px; }
+    .section-title { font-weight:bold; text-transform:uppercase; margin-top:12px; }
+    .indent { text-indent:28px; text-align:justify; }
+    table { width:100%; border-collapse:collapse; margin-top:6px; }
+    th, td { border:1px solid #000; padding:5px 6px; vertical-align:top; }
+    .num { text-align:right; white-space:nowrap; }
+    .voucher-doc-table {
+      table-layout:fixed;
+      width:100%;
+    }
+    .voucher-doc-table .stt {
+      width:5%;
+    }
+    .voucher-doc-table .supplier-col {
+      width:25%;
+    }
+    .voucher-doc-table .content-col {
+      width:20%;
+    }
+    .voucher-doc-table .document-amount-col {
+      width:15%;
+    }
+    .voucher-doc-table .ksnb-check-col {
+      width:15%;
+    }
+    .voucher-doc-table .note-col {
+      width:20%;
+    }
+    .amount-col { width:15%; min-width:110px; }
+    .stt { text-align:center; width:38px; }
+    .stt { text-align:center; width:38px; }
+    .total-row td { font-weight:bold; }
+    .warning-cell { color:#b00000; font-weight:bold; }	
+    .text-box { white-space:pre-wrap; text-align:justify; }
+    .sign-grid { display:grid; grid-template-columns:1fr 1fr; gap:48px; margin-top:28px; }
+    .sign-cell { text-align:center; min-height:120px; }
+    .sign-title { font-weight:bold; text-transform:uppercase; }
+    .sign-content { margin-top:18px; white-space:pre-line; font-style:italic; }
+    .sign-blank { height:78px; }
+    .route-history { margin-top:24px; font-size:12px; color:#333; }
+    @media print { .toolbar { display:none; } body { font-size:13.5px; } .route-history { display:none; } }
+  </style>
+</head>
+<body>
+<div class="toolbar">
+  {% if user.role_code in ['TONG_GIAM_DOC','PHO_TGD_THUONG_TRUC','PHO_TONG_GIAM_DOC'] %}
+  <a href="/revenue-control">Back</a>
+  {% else %}
+  <a href="/vouchers/{{ voucher.id }}">Back</a>
+  {% endif %}
+  <button onclick="window.print()">In biểu mẫu</button>
+</div>
+<div class="sheet">
+  <div class="header">
+    <div class="head-block left-head">
+      <img class="logo" src="/static/images/logo.png" alt="Logo">
+      <div class="left-text">
+        <div class="company-name">CÔNG TY TNHH BỆNH VIỆN<br>HÙNG VƯƠNG GIA LAI</div>
+        <div class="unit-name">BAN KIỂM SOÁT NỘI BỘ</div>
+        <div class="head-underline"></div>
+      </div>
+    </div>
+
+    <div class="head-block right-head">
+      <div class="national-name">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</div>
+      <div class="motto">Độc lập - Tự do - Hạnh phúc</div>
+      <div class="head-underline"></div>
+      <div class="date-line">{{ format_vn_date_line(voucher.created_at) }}</div>
+    </div>
+  </div>
+
+  <div class="title">Phiếu kiểm soát trước hồ sơ thu, chi quan trọng</div>
+
+  <div class="section-title">I. Thông tin chung</div>
+  <div>1. Tên hồ sơ/khoản thu, chi: <b>{{ voucher.title }}</b></div>
+  <div>2. Loại hồ sơ: {{ 'Thu quan trọng' if voucher['hồ_so_type'] == 'THU' else 'Chi quan trọng' }}</div>
+  <div>3. Số tiền: <b>{{ '{:,.0f}'.format(doc_total if docs else (voucher.total_amount or 0)).replace(',', '.') }} đồng</b></div>
+  <div>4. Đơn vị lập hồ sơ: {{ voucher.submitting_unit or '' }}</div>
+  <div>5. Người giao hồ sơ: {{ voucher.sender_name or '' }}</div>
+  <div>6. Ngày tiếp nhận hồ sơ tại Ban Kiểm soát nội bộ: {{ format_vn_datetime(voucher.received_at) }}</div>
+  <div>7. Hình thức trình phê duyệt: {{ voucher.approval_target or '' }}</div>
+
+  <div class="section-title">II. Nội dung kiểm soát trước</div>
+  <table>
+    <thead><tr><th class="stt">STT</th><th>Nội dung rà soát, kiểm soát</th><th>Ghi chú</th></tr></thead>
+    <tbody>
+      {% for item in review_items %}
+      <tr><td class="stt">{{ loop.index }}</td><td>{{ item.content }}</td><td>{{ item.note or '' }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="section-title">
+    {% if voucher.code and voucher.code.startswith('TM-KSNB') %}
+      III. Bảng đối chiếu thu, chi tiền mặt
+    {% else %}
+      III. Danh mục hồ sơ, tài liệu nhận kiểm soát
+    {% endif %}
+  </div>
+  <table class="voucher-doc-table">
+    <colgroup>
+      <col style="width:5%;">
+      <col style="width:15%;">
+      <col style="width:40%;">
+      <col style="width:15%;">
+      <col style="width:15%;">
+      <col style="width:10%;">
+    </colgroup>
+    <thead>
+      <tr>
+        <th class="stt">STT</th>
+        <th class="supplier-col">Nhà cung cấp</th>
+        <th class="content-col">Nội dung</th>
+        <th class="document-amount-col">Số tiền</th>
+        <th class="ksnb-check-col">Ban KSNB kiểm tra</th>
+        <th class="note-col">Ghi chú</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for d in docs %}
+      <tr>
+        <td class="stt">{{ loop.index }}</td>
+        <td class="supplier-col">{{ d.supplier or '' }}</td>
+        <td class="content-col">{{ d.content or '' }}</td>
+        <td class="num document-amount-col">{{ '{:,.0f}'.format(d.document_amount or 0).replace(',', '.') }}</td>
+        <td class="num ksnb-check-col {% if d.ksnb_check_type in ['DIFFERENT', 'REJECTED'] %}warning-cell{% endif %}">
+          {% if d.ksnb_check_type == 'MATCH' %}
+          ✓
+          {% elif d.ksnb_check_type == 'REJECTED' %}
+          0
+          {% else %}
+          {{ '{:,.0f}'.format(d.ksnb_checked_amount or 0).replace(',', '.') }}
+          {% endif %}
+        </td>
+        <td class="note-col {% if d.ksnb_check_type in ['DIFFERENT', 'REJECTED'] %}warning-cell{% endif %}">
+          {% if d.ksnb_check_type == 'REJECTED' %}Từ chối thanh toán{% endif %}
+          {% if d.ksnb_check_type == 'REJECTED' and (d.payment_transfer or d.payment_cash or d.ksnb_note) %}; {% endif %}
+          {% if d.payment_transfer %}Chuyển khoản{% endif %}
+          {% if d.payment_transfer and d.payment_cash %}; {% endif %}
+          {% if d.payment_cash %}Tiền mặt{% endif %}
+          {% if (d.payment_transfer or d.payment_cash) and d.ksnb_note %}; {% endif %}
+          {{ d.ksnb_note or '' }}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="center">Chưa có dữ liệu Mục III.</td></tr>
+      {% endfor %}
+      {% if docs %}
+      <tr class="total-row">
+        <td colspan="3" class="center">Tổng cộng</td>
+        <td class="num document-amount-col">{{ '{:,.0f}'.format(doc_total or 0).replace(',', '.') }}</td>
+        <td class="num ksnb-check-col">{{ '{:,.0f}'.format(ksnb_total or 0).replace(',', '.') }}</td>
+        <td class="num note-col">
+          {{ '{:,.0f}'.format((doc_total or 0) - (ksnb_total or 0)).replace(',', '.') }}
+        </td>
+      </tr>
+      {% endif %}
+    </tbody>
+  </table>
+
+  <div class="section-title">IV. Kết quả kiểm soát trước</div>
+  <div class="text-box"><b>{{ voucher.section_iv_result or '' }}</b>{% if voucher.section_iv_note %}<br>{{ voucher.section_iv_note }}{% endif %}</div>
+
+  {% for sec in optional_sections %}
+  <div class="section-title">{{ sec.roman }}. {{ sec.title }}</div>
+  <div class="text-box">{{ sec.content }}</div>
+  {% endfor %}
+
+  <div class="section-title">{{ conclusion_roman }}. Kết luận của Ban Kiểm soát nội bộ</div>
+  <div class="indent">{{ conclusion_text }}</div>
+
+  <div class="sign-grid">
+    <div class="sign-cell">
+      <div class="sign-title">Người kiểm soát</div>
+      {% set ns_creator = namespace(found=false) %}
+      {% for s in signatures %}
+        {% if s.signer_role == 'NGUOI_KIEM_SOAT' %}
+          {% set ns_creator.found = true %}
+          {% if s.signature_text and s.signature_text.startswith('Không ký số') %}
+          <div class="sign-blank"></div>
+          <div>{{ s.signer_name }}</div>
+          {% else %}
+          <div class="sign-content"><b>Ký số nội bộ</b><br>{{ s.signed_at }}<br>{{ s.signer_name }}</div>
+          {% endif %}
+        {% endif %}
+      {% endfor %}
+      {% if not ns_creator.found %}<div class="sign-blank"></div><div>{{ voucher.creator_name }}</div>{% endif %}
+    </div>
+
+    <div class="sign-cell">
+      <div class="sign-title">Trưởng ban Kiểm soát nội bộ</div>
+      {% set ns_head = namespace(found=false) %}
+      {% for s in signatures %}
+        {% if s.signer_role == 'TRUONG_BAN' %}
+          {% set ns_head.found = true %}
+          {% if s.signature_text and s.signature_text.startswith('Không ký số') %}
+          <div class="sign-blank"></div>
+          <div>{{ s.signer_name }}</div>
+          {% elif voucher.route_mode == 'DIRECT_BOARD' %}
+          <div class="sign-content">{{ delegation_text }}</div>
+          {% else %}
+          <div class="sign-content"><b>Ký số nội bộ</b><br>{{ s.signed_at }}<br>{{ s.signer_name }}</div>
+          {% endif %}
+        {% endif %}
+      {% endfor %}
+      {% if not ns_head.found %}
+        {% if voucher.route_mode == 'DIRECT_BOARD' %}<div class="sign-content">{{ delegation_text }}</div>{% else %}<div class="sign-blank"></div>{% endif %}
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="route-history">
+    <b>Lịch sử luân chuyển</b><br>
+    {% for r in routes %}
+    <div>- {{ r.created_at }} | {{ r.action }}{% if r.from_name %} | Từ: {{ r.from_name }}{% endif %}{% if r.to_name %} | Đến: {{ r.to_name }}{% endif %}{% if r.note %} | {{ r.note }}{% endif %}</div>
+    {% else %}
+    <span>Chưa có luân chuyển.</span>
+    {% endfor %}
+  </div>
+</div>
+</body>
+</html>

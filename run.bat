@@ -1,0 +1,22 @@
+@echo off
+cd /d %~dp0
+
+set HVGL_KSNB_ENV=production
+set HVGL_KSNB_SESSION_HTTPS_ONLY=0
+set HVGL_KSNB_SESSION_SECRET_KEY=HVGL_KSNB_2026_DOI_CHUOI_NAY_THANH_CHUOI_RAT_DAI_VA_BI_MAT
+set HVGL_KSNB_ADMIN_USERNAME=admin
+set HVGL_KSNB_ADMIN_PASSWORD=HvgL@2026_DoiNgaySauLanChayDau
+set HVGL_KSNB_MAX_FAILED_LOGIN_ATTEMPTS=5
+set HVGL_KSNB_LOGIN_LOCK_SECONDS=900
+set HVGL_KSNB_BUSINESS_IMPORT_MAX_UPLOAD_MB=80
+set HVGL_KSNB_DOCUMENT_MAX_UPLOAD_MB=50
+set HVGL_KSNB_CHAT_MAX_UPLOAD_MB=25
+set HVGL_KSNB_MEETING_MAX_UPLOAD_MB=50
+set HVGL_KSNB_DRAFT_MAX_UPLOAD_MB=50
+
+if exist ".venv\Scripts\python.exe" (
+    ".venv\Scripts\python.exe" -m uvicorn app.main:app --host 0.0.0.0 --port 5010
+) else (
+    python -m uvicorn app.main:app --host 0.0.0.0 --port 5010
+)
+pause

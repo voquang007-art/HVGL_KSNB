@@ -1,0 +1,1099 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+.meeting-layout{display:grid;grid-template-columns:360px 1fr;gap:16px;align-items:start}
+.meeting-card{background:#fff;border:1px solid #dbe4ee;border-radius:16px;padding:16px;box-shadow:0 10px 26px rgba(15,23,42,.06)}
+.meeting-card h3,.meeting-card h4{margin:0 0 12px}
+.meeting-note{font-size:13px;color:#64748b;line-height:1.45}
+.meeting-list{max-height:430px;overflow:auto;display:grid;gap:10px}
+.meeting-item{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:12px;border:1px solid #dbe4ee;border-radius:14px;background:#fff}
+.meeting-item.is-active{border-color:#0f766e;background:#f0fdfa}
+.meeting-item-link{flex:1 1 auto;color:#0f172a;text-decoration:none}
+.meeting-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.meeting-meta{font-size:12px;color:#64748b;margin-top:6px}
+.meeting-pill{display:inline-flex;align-items:center;justify-content:center;padding:4px 10px;border-radius:999px;background:#eff6ff;color:#1d4ed8;font-size:12px;font-weight:700}
+.meeting-pill.live{background:#dcfce7;color:#166534}
+.meeting-pill.ended{background:#e2e8f0;color:#334155}
+.meeting-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.meeting-btn{display:inline-flex;align-items:center;justify-content:center;border:1px solid #0f766e;background:#0f766e;color:#fff;border-radius:10px;padding:9px 14px;text-decoration:none;cursor:pointer;font:inherit}
+.meeting-btn.secondary{background:#fff;color:#0f172a;border-color:#cbd5e1}
+.meeting-btn.warn{background:#b91c1c;border-color:#b91c1c}
+.meeting-btn.gold{background:#92400e;border-color:#92400e}
+.meeting-btn.danger-outline{background:#fff;color:#b91c1c;border-color:#fecaca}
+.meeting-btn.soft-blue{background:#dbeafe;color:#1e3a8a;border-color:#93c5fd;font-weight:700}
+.meeting-btn.soft-blue:hover{background:#bfdbfe;border-color:#60a5fa}
+.meeting-btn[disabled]{opacity:.55;cursor:not-allowed}
+.meeting-field{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
+.meeting-field input,.meeting-field select,.meeting-field textarea{border:1px solid #cbd5e1;border-radius:10px;padding:10px 12px;font:inherit}
+.meeting-field textarea{min-height:76px;resize:vertical}
+.meeting-time-save-row{
+  display:flex;
+  align-items:center;
+  justify-content:flex-start;
+  margin:0 0 10px;
+  position:relative;
+  z-index:5;
+}
+.meeting-time-save-row .meeting-btn{
+  width:auto;
+  max-width:100%;
+  white-space:normal;
+  box-shadow:0 4px 12px rgba(30,58,138,.16);
+}
+.meeting-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:16px}
+.meeting-box{border:1px solid #e2e8f0;border-radius:14px;padding:14px;background:#fff;margin-top:16px}
+.meeting-table{width:100%;border-collapse:collapse}
+.meeting-table th,.meeting-table td{padding:9px 8px;border-bottom:1px solid #e2e8f0;text-align:left;vertical-align:top;font-size:14px}
+.meeting-chat-list{max-height:380px;overflow:auto;border:1px solid #e2e8f0;border-radius:12px;padding:12px;background:#f8fafc;display:grid;gap:10px}
+.meeting-chat-item{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:10px 12px}
+.meeting-chat-item.mine{border-color:#bfdbfe;background:#eff6ff}
+.meeting-chat-meta{font-size:12px;color:#64748b;margin-bottom:6px}
+.meeting-doc-list{display:grid;gap:10px}
+.meeting-doc-item{border:1px solid #e2e8f0;border-radius:12px;padding:10px 12px;background:#f8fafc}
+.meeting-doc-title{font-weight:700;color:#0f172a}
+.meeting-doc-meta{font-size:12px;color:#64748b;margin-top:4px}
+.meeting-doc-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.meeting-empty{padding:12px;border:1px dashed #cbd5e1;border-radius:12px;background:#f8fafc;color:#64748b}
+.meeting-alert-ok{margin-bottom:14px;border-color:#86efac;background:#f0fdf4;color:#166534}
+.meeting-alert-err{margin-bottom:14px;border-color:#fecaca;background:#fef2f2;color:#991b1b}
+.meeting-tree{border:1px solid #0f4c81;border-radius:12px;background:#fff;overflow:hidden}
+.meeting-tree-summary{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;cursor:pointer;font-weight:700;list-style:none;background:#0f4c81;color:#fff}
+.meeting-tree-summary::-webkit-details-marker{display:none}
+.meeting-tree-body{padding:10px}
+.meeting-month-group{border:1px solid #e2e8f0;border-radius:10px;background:#fff;margin-top:10px}
+.meeting-month-summary{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;cursor:pointer;font-weight:700;list-style:none}
+.meeting-month-summary::-webkit-details-marker{display:none}
+.meeting-month-body{padding:10px;border-top:1px solid #eef2f7}
+.meeting-multiselect{position:relative;display:flex;flex-direction:column;gap:6px}
+.meeting-multiselect-btn{
+  width:100%;
+  min-height:42px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  border:1px solid #cbd5e1;
+  border-radius:12px;
+  padding:9px 12px;
+  background:linear-gradient(180deg,#ffffff,#f8fafc);
+  font:inherit;
+  color:#0f172a;
+  cursor:pointer;
+  box-shadow:0 2px 8px rgba(15,23,42,.04);
+}
+.meeting-multiselect-btn:hover{
+  border-color:#0f766e;
+  box-shadow:0 4px 14px rgba(15,118,110,.10);
+}
+.meeting-multiselect.open .meeting-multiselect-btn{
+  border-color:#0f766e;
+  box-shadow:0 0 0 3px rgba(15,118,110,.12);
+}
+.meeting-multiselect-label{flex:1;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.meeting-multiselect-arrow{
+  flex:0 0 auto;
+  color:#475569;
+  font-size:12px;
+  transition:transform .18s ease;
+}
+.meeting-multiselect.open .meeting-multiselect-arrow{transform:rotate(180deg)}
+.meeting-multiselect-panel{
+  position:absolute;
+  top:calc(100% + 8px);
+  left:0;
+  right:0;
+  z-index:80;
+  display:none;
+  background:#fff;
+  border:1px solid #dbe4ee;
+  border-radius:14px;
+  box-shadow:0 18px 38px rgba(15,23,42,.16);
+  padding:10px;
+  margin-top:0;
+}
+.meeting-multiselect.open .meeting-multiselect-panel{display:block}
+.meeting-multiselect-search{width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:10px;padding:8px 10px;font:inherit;margin-bottom:8px}
+.meeting-multiselect-list{
+  max-height:min(240px, 38vh);
+  overflow:auto;
+  display:grid;
+  gap:4px;
+  padding-right:2px;
+}
+.meeting-multiselect-option{
+  display:flex;
+  align-items:flex-start;
+  gap:8px;
+  padding:7px 8px;
+  border-radius:10px;
+  cursor:pointer;
+  border:1px solid transparent;
+}
+.meeting-multiselect-option:hover{background:#f8fafc;border-color:#e2e8f0}
+.meeting-multiselect-option input{margin-top:3px}
+.meeting-multiselect-footer{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin-top:10px;
+  padding-top:10px;
+  border-top:1px solid #e2e8f0;
+}
+.meeting-multiselect-count{
+  color:#64748b;
+  font-size:12px;
+  line-height:1.4;
+}
+.meeting-multiselect-confirm{
+  min-width:96px;
+  height:36px;
+  padding:0 16px;
+  border-radius:10px;
+  border:1px solid #0f766e;
+  background:#0f766e;
+  color:#ffffff;
+  font:inherit;
+  font-weight:700;
+  cursor:pointer;
+  white-space:nowrap;
+}
+.meeting-multiselect-confirm:hover{background:#0d665f}
+.meeting-collapsible-toggle{
+  width:100%;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  border:1px solid #0f4c81;
+  border-radius:10px;
+  padding:10px 12px;
+  background:#0f4c81;
+  color:#ffffff;
+  font:inherit;
+  font-weight:700;
+  cursor:pointer;
+}
+.meeting-collapsible-toggle:hover{background:#0c416e}
+.meeting-collapsible-title{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.meeting-collapsible-summary{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.meeting-summary-pill{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  padding:4px 10px;
+  border-radius:999px;
+  font-size:12px;
+  font-weight:700;
+  color:#fff;
+  line-height:1;
+}
+.meeting-summary-pill.pending{background:#475569}
+.meeting-summary-pill.absent{background:#b91c1c}
+.meeting-summary-pill.checkedin{background:#15803d}
+.meeting-collapsible-arrow{font-size:14px;color:#ffffff;transition:transform .2s ease}
+.meeting-collapsible.open .meeting-collapsible-arrow{transform:rotate(180deg)}
+.meeting-collapsible-body{display:none;margin-top:12px}
+.meeting-collapsible.open .meeting-collapsible-body{display:block}
+.meeting-attendance-scroll{max-height:320px;overflow:auto;padding-right:4px}
+.meeting-conclusion-title{color:#b91c1c;font-weight:800;letter-spacing:.2px}
+.meeting-conclusion-box{border:1px solid #fecaca;background:#fff7f7}
+.meeting-conclusion-note{color:#991b1b;font-size:12px;font-weight:600}
+.meeting-conclusion-display{
+  white-space:pre-wrap;
+  border:1px solid #fecaca;
+  background:#ffffff;
+  border-radius:10px;
+  padding:12px;
+  min-height:84px;
+}
+.meeting-modal-backdrop{
+  position:fixed;
+  inset:0;
+  z-index:9999;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  padding:20px;
+  background:rgba(15,23,42,.42);
+}
+.meeting-modal-backdrop.open{display:flex}
+.meeting-modal{
+  width:min(520px,100%);
+  background:#ffffff;
+  border:1px solid #dbe4ee;
+  border-radius:16px;
+  box-shadow:0 24px 60px rgba(15,23,42,.24);
+  padding:18px;
+}
+.meeting-modal-title{
+  margin:0 0 8px;
+  color:#0f172a;
+  font-size:18px;
+  font-weight:800;
+}
+.meeting-modal-note{
+  margin-bottom:12px;
+  color:#64748b;
+  font-size:13px;
+  line-height:1.45;
+}
+.meeting-modal textarea{
+  width:100%;
+  box-sizing:border-box;
+  min-height:92px;
+}
+.meeting-modal-actions{
+  display:flex;
+  justify-content:flex-end;
+  gap:8px;
+  flex-wrap:wrap;
+  margin-top:12px;
+}
+.meeting-mobile-tabs{
+  display:none;
+}
+
+@media (max-width:1100px){
+  .meeting-layout,.meeting-grid{grid-template-columns:1fr}
+}
+
+@media (max-width:900px){
+  .meeting-layout{
+    display:block;
+  }
+
+  .meeting-card{
+    padding:12px;
+    border-radius:14px;
+  }
+
+  .meeting-list{
+    max-height:320px;
+  }
+
+  .meeting-actions{
+    display:grid;
+    grid-template-columns:1fr;
+    align-items:stretch;
+  }
+
+  .meeting-actions > *,
+  .meeting-actions form,
+  .meeting-actions button,
+  .meeting-actions a{
+    width:100%;
+  }
+
+  .meeting-btn{
+    min-height:44px;
+    width:100%;
+  }
+
+  .meeting-field input,
+  .meeting-field select,
+  .meeting-field textarea{
+    min-height:44px;
+    font-size:16px;
+  }
+
+  .meeting-table{
+    display:block;
+    width:100%;
+    max-width:100%;
+    overflow-x:auto;
+    -webkit-overflow-scrolling:touch;
+  }
+
+  .meeting-table th,
+  .meeting-table td{
+    white-space:nowrap;
+  }
+
+  .meeting-table td{
+    max-width:320px;
+    white-space:normal;
+  }
+
+  .meeting-mobile-tabs{
+    position:sticky;
+    top:0;
+    z-index:60;
+    display:flex;
+    gap:8px;
+    overflow-x:auto;
+    -webkit-overflow-scrolling:touch;
+    padding:8px 0 10px;
+    margin:12px 0 4px;
+    background:#eef5fb;
+  }
+
+  .meeting-mobile-tab{
+    flex:0 0 auto;
+    border:1px solid #cbd5e1;
+    border-radius:999px;
+    background:#ffffff;
+    color:#0f172a;
+    min-height:40px;
+    padding:0 12px;
+    font-weight:800;
+    cursor:pointer;
+    white-space:nowrap;
+  }
+
+  .meeting-mobile-tab.is-active{
+    border-color:#0f766e;
+    background:#0f766e;
+    color:#ffffff;
+  }
+
+  .meeting-mobile-section.is-mobile-hidden{
+    display:none !important;
+  }
+
+  .meeting-chat-list{
+    max-height:42dvh;
+  }
+
+  .meeting-attendance-scroll{
+    max-height:42dvh;
+  }
+
+  .meeting-multiselect-panel{
+    position:fixed;
+    left:10px;
+    right:10px;
+    top:96px;
+    max-height:calc(100dvh - 120px);
+    overflow:auto;
+  }
+
+  .meeting-modal{
+    max-height:calc(100dvh - 40px);
+    overflow:auto;
+  }
+}
+
+@media (max-width:520px){
+  .meeting-top{
+    flex-direction:column;
+    align-items:flex-start;
+  }
+
+  .meeting-mobile-tabs{
+    margin-left:-2px;
+    margin-right:-2px;
+  }
+
+  .meeting-doc-actions{
+    display:grid;
+    grid-template-columns:1fr;
+  }
+}
+</style>
+
+{% set msg = request.query_params.get('msg') %}
+{% set err = request.query_params.get('error') %}
+{% if msg %}<div class="meeting-card meeting-alert-ok">{{ msg }}</div>{% endif %}
+{% if err %}<div class="meeting-card meeting-alert-err">{{ err }}</div>{% endif %}
+
+<div class="meeting-layout">
+  <section class="meeting-card" id="meetingSidebar">
+    <h3>Họp trực tuyến</h3>
+    <div class="meeting-note" style="margin-bottom:10px;">
+      Tạo phòng họp riêng, mời thành viên, điểm danh, báo vắng, đăng ký phát biểu và lưu tài liệu cuộc họp.
+    </div>
+
+    <div class="meeting-actions" style="margin-bottom:12px;">
+      <span class="meeting-pill">Tổng số: {{ total_meeting_count }}</span>
+      <span class="meeting-pill">Được mời: {{ invited_meeting_count }}</span>
+    </div>
+
+    <details class="meeting-tree" open>
+      <summary class="meeting-tree-summary">
+        <span>Danh sách cuộc họp</span>
+        <span>{{ groups|length }} cuộc họp</span>
+      </summary>
+      <div class="meeting-tree-body">
+        {% if meeting_groups_by_month %}
+          {% for year_bucket in meeting_groups_by_month %}
+            {% for month_bucket in year_bucket.months %}
+              <details class="meeting-month-group" {% if month_bucket.is_open %}open{% endif %}>
+                <summary class="meeting-month-summary">
+                  <span>{{ month_bucket.month_label }}</span>
+                  <span class="meeting-pill">{{ month_bucket.count }}</span>
+                </summary>
+                <div class="meeting-month-body">
+                  <div class="meeting-list">
+                    {% for g in month_bucket.groups %}
+                      {% set mt = g.meeting_row %}
+                      <div class="meeting-item {% if selected_id == g.id %}is-active{% endif %}">
+                        <a class="meeting-item-link" href="/meetings?selected_id={{ g.id }}">
+                          <div class="meeting-top">
+                            <strong>{{ g.name }}</strong>
+                            <span class="meeting-pill {% if mt and mt.meeting_status == 'LIVE' %}live{% elif mt and mt.meeting_status == 'ENDED' %}ended{% endif %}">
+                              {{ g.list_status_label }}
+                            </span>
+                          </div>
+                          <div class="meeting-meta">
+                            {{ g.member_count or 0 }} thành viên
+                            {% if mt and mt.scheduled_start_at %}
+                              • {{ mt.scheduled_start_at|format_vn_dt }}
+                            {% endif %}
+                          </div>
+                        </a>
+                        {% if g.can_delete_meeting %}
+                          <form method="post" action="/meetings/{{ g.id }}/delete" onsubmit="return confirm('Xác nhận xóa cuộc họp này?');">
+                            <button type="submit" class="meeting-btn danger-outline">Xóa</button>
+                          </form>
+                        {% endif %}
+                      </div>
+                    {% endfor %}
+                  </div>
+                </div>
+              </details>
+            {% endfor %}
+          {% endfor %}
+        {% else %}
+          <div class="meeting-empty">Chưa có cuộc họp nào.</div>
+        {% endif %}
+      </div>
+    </details>
+
+    <div class="meeting-box">
+      <h4>Tạo buổi họp</h4>
+      {% if current_user_can_create_meeting %}
+        <form method="post" action="/meetings/create">
+          <div class="meeting-field">
+            <label>Tên buổi họp</label>
+            <input type="text" name="name" required>
+          </div>
+
+          <div class="meeting-field">
+            <label>Loại cuộc họp</label>
+            <select name="meeting_scope" id="meetingScopeSelect" required>
+              {% for value, label in meeting_scope_options %}
+                <option value="{{ value }}">{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="meeting-time-save-row">
+            <button type="button" class="meeting-btn soft-blue" id="meetingCreateTimeConfirmBtn">Lưu thời gian</button>
+          </div>
+
+          <div class="meeting-field">
+            <label>Bắt đầu</label>
+            <input type="datetime-local" name="scheduled_start_at" required>
+          </div>
+
+          <div class="meeting-field">
+            <label>Kết thúc</label>
+            <input type="datetime-local" name="scheduled_end_at">
+          </div>
+
+          <div class="meeting-field">
+            <label>Nội dung dự kiến / Hồ sơ, Phiếu kiểm soát, Đoàn hoặc Tổ trưng tập liên quan</label>
+            <textarea
+              name="agenda"
+              placeholder="Ghi rõ nội dung dự kiến; nếu họp theo hồ sơ kiểm soát, phiếu kiểm soát, đoàn/tổ trưng tập hoặc vụ việc cụ thể thì ghi tại đây."
+            ></textarea>
+            <div class="meeting-note">
+              Trường này dùng để xác định phạm vi nghiệp vụ của cuộc họp. Khi họp với thành viên trưng tập, chỉ tick chọn đúng người liên quan, không mời toàn bộ thành viên trưng tập.
+            </div>
+          </div>
+
+          <div class="meeting-field">
+            <label>Thành phần dự họp</label>
+            <div class="meeting-multiselect" id="participantMultiSelect">
+              <button type="button" class="meeting-multiselect-btn" id="participantMultiSelectBtn">
+                <span class="meeting-multiselect-label" id="participantMultiSelectLabel">-- Chọn thành phần dự họp --</span>
+                <span class="meeting-multiselect-arrow">▼</span>
+              </button>
+              <div class="meeting-multiselect-panel" id="participantMultiSelectPanel">
+                <input type="text" class="meeting-multiselect-search" id="participantMultiSelectSearch" placeholder="Tìm người dự họp...">
+                <div class="meeting-multiselect-list" id="participantMultiSelectList">
+                  {% for u in meeting_participant_options %}
+                    <label
+                      class="meeting-multiselect-option"
+                      data-label="{{ u.label|lower }}"
+                      data-scopes="{{ u.scopes|join(',') }}"
+                      data-is-board="{{ '1' if u.is_board else '0' }}"
+                    >
+                      <input type="checkbox" name="participant_ids" value="{{ u.id }}">
+                      <span>{{ u.label }}</span>
+                    </label>
+                  {% endfor %}
+                </div>
+                <div class="meeting-multiselect-footer">
+                  <span class="meeting-multiselect-count" id="participantMultiSelectCount">Chưa chọn thành viên</span>
+                  <button type="button" class="meeting-multiselect-confirm" id="participantMultiSelectConfirm">Chọn</button>
+                </div>
+              </div>
+            </div>
+            <div class="meeting-note">Danh sách sẽ tự lọc theo loại cuộc họp. Người tạo được tự động đưa vào cuộc họp.</div>
+          </div>
+
+          <div class="meeting-field">
+            <label>Chủ trì</label>
+            <select name="host_user_id" id="meetingHostSelect">
+              <option value="">-- Mặc định là người tạo --</option>
+              {% for u in meeting_participant_options %}
+                <option value="{{ u.id }}" data-scopes="{{ u.scopes|join(',') }}">{{ u.label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="meeting-field">
+            <label>Thư ký</label>
+            <select name="secretary_user_id" id="meetingSecretarySelect">
+              <option value="">-- Chưa chọn --</option>
+              {% for u in meeting_participant_options %}
+                <option value="{{ u.id }}" data-scopes="{{ u.scopes|join(',') }}">{{ u.label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <button type="submit" class="meeting-btn">Tạo phòng họp</button>
+        </form>
+      {% else %}
+        <div class="meeting-empty">Vị trí hiện tại không được tạo cuộc họp.</div>
+      {% endif %}
+    </div>
+  </section>
+
+  <section id="meetingDetailPane" data-selected-id="{{ selected_id or '' }}">
+    {% if selected_detail %}
+      {% set d = selected_detail %}
+      {% set meeting = d.meeting %}
+      {% set group = d.group %}
+
+      <div class="meeting-mobile-tabs" id="meetingMobileTabs" aria-label="Điều hướng nội dung cuộc họp">
+        <button type="button" class="meeting-mobile-tab is-active" data-meeting-mobile-tab="info">Thông tin</button>
+        <button type="button" class="meeting-mobile-tab" data-meeting-mobile-tab="docs">Tài liệu</button>
+        <button type="button" class="meeting-mobile-tab" data-meeting-mobile-tab="attendance">Điểm danh</button>
+        <button type="button" class="meeting-mobile-tab" data-meeting-mobile-tab="discussion">Trao đổi</button>
+        <button type="button" class="meeting-mobile-tab" data-meeting-mobile-tab="speaker">Phát biểu</button>
+        <button type="button" class="meeting-mobile-tab" data-meeting-mobile-tab="conclusion">Kết luận</button>
+      </div>
+
+      <div class="meeting-card meeting-mobile-section" data-meeting-mobile-section="info">
+        <div class="meeting-top">
+          <div>
+            <h3>{{ group.name }}</h3>
+            <div class="meeting-note">
+              {{ d.meeting_scope_label }} • {{ d.meeting_status_label }}
+            </div>
+          </div>
+          <span class="meeting-pill {% if meeting.meeting_status == 'LIVE' %}live{% elif meeting.meeting_status == 'ENDED' %}ended{% endif %}">
+            {{ d.meeting_status_label }}
+          </span>
+        </div>
+
+        <table class="meeting-table" style="margin-top:12px;">
+          <tr>
+            <th style="width:180px;">Chủ trì</th>
+            <td>{{ d.host_name }}</td>
+          </tr>
+          <tr>
+            <th>Thư ký</th>
+            <td>{{ d.secretary_name }}</td>
+          </tr>
+          <tr>
+            <th>Người thiết kế</th>
+            <td>{{ d.designed_by_name }}</td>
+          </tr>
+          <tr>
+            <th>Thời gian</th>
+            <td>{{ meeting.scheduled_start_at|format_vn_dt }}{% if meeting.scheduled_end_at %} - {{ meeting.scheduled_end_at|format_vn_dt }}{% endif %}</td>
+          </tr>
+          <tr>
+            <th>Nội dung dự kiến</th>
+            <td>{{ meeting.agenda or '—' }}</td>
+          </tr>
+        </table>
+
+        <div class="meeting-actions" id="meetingMainActions" data-group-id="{{ group.id }}" style="margin-top:12px;">
+          {% if d.can_absent %}
+            <form method="post" action="/meetings/{{ group.id }}/absent" data-meeting-action="absent">
+              <input type="hidden" name="reason" value="">
+              <button class="meeting-btn warn" type="submit">Báo vắng</button>
+            </form>
+          {% endif %}
+
+          {% if d.can_cancel_absent %}
+            <form method="post" action="/meetings/{{ group.id }}/absent/cancel" data-meeting-action="absent-cancel">
+              <button class="meeting-btn secondary" type="submit">Hủy báo vắng</button>
+            </form>
+          {% endif %}
+
+          {% if d.can_checkin %}
+            <form method="post" action="/meetings/{{ group.id }}/checkin" data-meeting-action="checkin">
+              <button class="meeting-btn" type="submit">Điểm danh</button>
+            </form>
+          {% endif %}
+
+          {% if d.can_request_leave %}
+            <form method="post" action="/meetings/{{ group.id }}/leave/request" data-meeting-action="leave-request">
+              <input type="hidden" name="note" value="">
+              <button class="meeting-btn warn" type="submit">Xin phép rời cuộc họp</button>
+            </form>
+          {% elif d.has_pending_leave_request %}
+            <span class="meeting-pill">Đã xin phép rời họp, chờ Chủ trì cho phép</span>
+          {% endif %}
+
+          {% if d.can_export_minutes %}
+            <a class="meeting-btn secondary" href="/meetings/{{ group.id }}/minutes.txt">Xuất biên bản TXT</a>
+          {% endif %}
+        </div>
+      </div>
+
+      {% if d.can_manage %}
+      <div class="meeting-card meeting-mobile-section" data-meeting-mobile-section="info" style="margin-top:16px;">
+        <h4>Điều hành cuộc họp</h4>
+
+        <form method="post" action="/meetings/{{ group.id }}/schedule">
+          <h4>Điều chỉnh thời gian cuộc họp</h4>
+          <div class="meeting-note" style="margin-bottom:10px;">
+            Có thể điều chỉnh riêng thời gian bắt đầu, riêng thời gian kết thúc hoặc đồng thời cả hai theo trạng thái thực tế của cuộc họp.
+          </div>
+          <div class="meeting-grid">
+            <div class="meeting-field">
+              <label>Điều chỉnh thời gian bắt đầu</label>
+              <input
+                type="datetime-local"
+                name="scheduled_start_at"
+                value="{{ d.schedule_start_local_value }}"
+                {% if not d.can_adjust_start %}readonly{% endif %}
+                required
+              >
+              <div class="meeting-note">
+                {% if d.can_adjust_start %}
+                  Được điều chỉnh vì cuộc họp chưa đến thời gian bắt đầu.
+                {% else %}
+                  Không được điều chỉnh vì cuộc họp đã đến hoặc đã qua thời gian bắt đầu.
+                {% endif %}
+              </div>
+            </div>
+            <div class="meeting-field">
+              <label>Điều chỉnh thời gian kết thúc</label>
+              <input
+                type="datetime-local"
+                name="scheduled_end_at"
+                value="{{ d.schedule_end_local_value }}"
+                {% if not d.can_adjust_end %}readonly{% endif %}
+              >
+              <div class="meeting-note">
+                {% if d.can_adjust_end %}
+                  Được điều chỉnh khi cuộc họp chưa bắt đầu hoặc đang họp và chưa đến thời gian kết thúc hiện tại.
+                {% else %}
+                  Không được điều chỉnh vì cuộc họp đã qua thời gian kết thúc hiện tại.
+                {% endif %}
+              </div>
+            </div>
+          </div>
+          <button class="meeting-btn soft-blue" type="submit">Xác nhận điều chỉnh thời gian</button>
+        </form>
+
+        <div class="meeting-grid" style="margin-top:12px;">
+          <form method="post" action="/meetings/{{ group.id }}/host">
+            <div class="meeting-field">
+              <label>Đổi Chủ trì</label>
+              <select name="host_user_id" required>
+                {% for row in d.attendance_rows %}
+                  <option value="{{ row.user.id }}" {% if meeting.host_user_id|string == row.user.id|string %}selected{% endif %}>
+                    {{ row.user.full_name or row.user.username }}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+            <button class="meeting-btn soft-blue" type="submit">Lưu Chủ trì</button>
+          </form>
+
+          <form method="post" action="/meetings/{{ group.id }}/secretary">
+            <div class="meeting-field">
+              <label>Đổi Thư ký</label>
+              <select name="secretary_user_id">
+                <option value="">-- Chưa chọn --</option>
+                {% for row in d.attendance_rows %}
+                  <option value="{{ row.user.id }}" {% if meeting.secretary_user_id|string == row.user.id|string %}selected{% endif %}>
+                    {{ row.user.full_name or row.user.username }}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+            <button class="meeting-btn soft-blue" type="submit">Lưu Thư ký</button>
+          </form>
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="meeting-grid">
+        <div>
+          <div class="meeting-card meeting-mobile-section" data-meeting-mobile-section="docs" style="margin-top:16px;">
+            <h4>Tài liệu phục vụ cuộc họp</h4>
+            <div class="meeting-note" style="margin-bottom:10px;">
+              Chủ trì, Thư ký hoặc người thiết kế cuộc họp được tải tài liệu phục vụ cuộc họp.
+            </div>
+
+            {% if d.can_upload_documents or d.can_manage %}
+              <form method="post" action="/meetings/{{ group.id }}/documents/upload" enctype="multipart/form-data" style="margin-bottom:12px;">
+                <div class="meeting-field">
+                  <label>Upload tài liệu</label>
+                  <input type="file" name="upload" required>
+                </div>
+                <button class="meeting-btn soft-blue" type="submit">Tải tài liệu lên</button>
+              </form>
+            {% endif %}
+
+            <div class="meeting-doc-list" id="meetingDocumentList">
+              {% for doc in d.meeting_documents %}
+                <div class="meeting-doc-item">
+                  <div class="meeting-doc-title">{{ doc.filename }}</div>
+                  <div class="meeting-doc-meta">Tải lên bởi {{ doc.sender_name }} • {{ doc.created_at_text }}</div>
+                  <div class="meeting-doc-actions">
+                    {% if doc.is_previewable %}
+                      <a class="meeting-btn soft-blue" href="{{ doc.preview_url }}" target="_blank" rel="noopener">Xem tài liệu</a>
+                    {% endif %}
+                    <a class="meeting-btn soft-blue" href="{{ doc.download_url }}">Tải về</a>
+                  </div>
+                </div>
+              {% else %}
+                <div class="meeting-note">Chưa có tài liệu phục vụ cuộc họp.</div>
+              {% endfor %}
+            </div>
+          </div>
+
+          <div class="meeting-card meeting-conclusion-box meeting-mobile-section" data-meeting-mobile-section="conclusion" id="meetingConclusionBox" style="margin-top:16px;">
+            <h4 class="meeting-conclusion-title">Kết luận cuộc họp</h4>
+            <div class="meeting-conclusion-note" style="margin-bottom:10px;">
+              Nội dung này được đưa vào biên bản cuộc họp.
+            </div>
+
+            {% if d.conclusion_text %}
+              <div class="meeting-conclusion-display" id="meetingConclusionDisplay">{{ d.conclusion_text }}</div>
+              {% if d.conclusion_updated_text %}
+                <div class="meeting-note" id="meetingConclusionUpdatedText" style="margin-top:8px;">Cập nhật gần nhất: {{ d.conclusion_updated_text }}</div>
+              {% endif %}
+            {% else %}
+              <div class="meeting-empty">Chưa có kết luận cuộc họp.</div>
+            {% endif %}
+
+            {% if d.can_edit_conclusion %}
+              <form method="post" action="/meetings/{{ group.id }}/conclusion/save" style="margin-top:12px;">
+                <div class="meeting-field">
+                  <label>Nhập / cập nhật kết luận cuộc họp</label>
+                  <textarea name="conclusion_text" required>{{ d.conclusion_text }}</textarea>
+                </div>
+                <button type="submit" class="meeting-btn warn">Lưu kết luận</button>
+              </form>
+            {% endif %}
+
+            {% if d.can_export_minutes %}
+              <div class="meeting-minutes-actions">
+                <a class="meeting-btn secondary" href="/meetings/{{ group.id }}/minutes.txt">Xuất biên bản (.txt)</a>
+              </div>
+            {% endif %}
+          </div>
+
+          <div class="meeting-card meeting-mobile-section" data-meeting-mobile-section="discussion" style="margin-top:16px;">
+            <h4>Trao đổi trong cuộc họp</h4>
+
+            <div class="meeting-chat-list" id="meetingChatList" data-group-id="{{ group.id }}">
+              {% for m in d.messages %}
+                {% if m.message_type != 'MEETING_DOC' and m.message_type != 'MEETING_CONCLUSION' %}
+                  <div class="meeting-chat-item {% if m.is_mine %}mine{% endif %}" data-message-id="{{ m.id }}">
+                    <div class="meeting-chat-meta">{{ m.sender_name }} • {{ m.created_at_text }}</div>
+                    <div>{{ m.content }}</div>
+                    {% if m.attachments %}
+                      <div class="meeting-doc-actions" style="margin-top:8px;">
+                        {% for att in m.attachments %}
+                          {% if att.is_previewable %}
+                            <a class="meeting-btn secondary" href="{{ att.preview_url }}" target="_blank">Xem</a>
+                          {% endif %}
+                          <a class="meeting-btn secondary" href="{{ att.download_url }}">{{ att.filename }}</a>
+                        {% endfor %}
+                      </div>
+                    {% endif %}
+                  </div>
+                {% endif %}
+              {% else %}
+                <div class="meeting-empty">Chưa có nội dung trao đổi.</div>
+              {% endfor %}
+            </div>
+
+            <form method="post" action="/meetings/{{ group.id }}/messages/send" style="margin-top:12px;" id="meetingMessageForm">
+              <div class="meeting-field">
+                <label>Nội dung trao đổi</label>
+                <textarea id="meetingMessageTextarea" name="content" required placeholder="Có thể gõ trước nội dung. Chỉ gửi được sau khi được Chủ trì cho phép phát biểu."></textarea>
+              </div>
+              <button class="meeting-btn" type="submit" {% if not d.can_send_meeting_message %}disabled{% endif %}>Gửi tin</button>
+              {% if not d.can_send_meeting_message %}
+                <div class="meeting-note" style="margin-top:8px;">
+                  Người tham dự phải điểm danh và được Chủ trì cho phép phát biểu trước khi gửi nội dung.
+                </div>
+              {% else %}
+                <div class="meeting-note" style="margin-top:8px;">
+                  Anh/chị đang được phép gửi nội dung phát biểu. Sau khi gửi xong, quyền phát biểu sẽ tự khóa nếu không phải Chủ trì/Thư ký.
+                </div>
+              {% endif %}
+            </form>
+          </div>
+        </div>
+
+        <div>
+          <div class="meeting-card meeting-mobile-section" data-meeting-mobile-section="attendance" style="margin-top:16px;">
+            <div class="meeting-collapsible open" id="meetingAttendanceBox">
+              <button type="button" class="meeting-collapsible-toggle" onclick="document.getElementById('meetingAttendanceBox').classList.toggle('open');">
+                <span class="meeting-collapsible-title">Điểm danh / Báo vắng</span>
+                <span class="meeting-collapsible-summary">
+                  <span class="meeting-summary-pill pending">Chờ: {{ d.attendance_pending_count }}</span>
+                  <span class="meeting-summary-pill absent">Vắng: {{ d.attendance_absent_count }}</span>
+                  <span class="meeting-summary-pill checkedin">Có mặt: {{ d.attendance_checked_in_count }}</span>
+                  <span class="meeting-collapsible-arrow">▼</span>
+                </span>
+              </button>
+
+              <div class="meeting-collapsible-body">
+                <div class="meeting-attendance-scroll">
+                  <table class="meeting-table">
+                    <thead>
+                      <tr>
+                        <th>Thành viên</th>
+                        <th>Trạng thái</th>
+                      </tr>
+                    </thead>
+                    <tbody id="meetingAttendanceTableBody">
+                      {% for row in d.attendance_rows %}
+                        <tr data-user-id="{{ row.user_id }}">
+                          <td>
+                            <strong>{{ row.user.full_name or row.user.username }}</strong>
+                            <div class="meeting-note">{{ row.user.position_title }}</div>
+                            {% if row.absent_reason %}
+                              <div class="meeting-note">Lý do: {{ row.absent_reason }}</div>
+                            {% endif %}
+                          </td>
+                          <td>
+                            <span class="meeting-pill meeting-attendance-status-pill">{{ row.attendance_status_label }}</span>
+                            <div class="meeting-note meeting-presence-status-text">{{ row.presence_status_label }}</div>
+                          </td>
+                        </tr>
+                      {% else %}
+                        <tr>
+                          <td colspan="2">Chưa có thành viên.</td>
+                        </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {% if d.can_request_leave %}
+          <div class="meeting-card meeting-mobile-section" data-meeting-mobile-section="attendance" style="margin-top:16px;">
+            <h4>Xin phép rời cuộc họp</h4>
+            <form method="post" action="/meetings/{{ group.id }}/leave/request">
+              <div class="meeting-field">
+                <label>Lý do xin rời cuộc họp</label>
+                <textarea name="note" placeholder="Nhập lý do xin phép rời cuộc họp."></textarea>
+              </div>
+              <button class="meeting-btn warn" type="submit">Gửi xin phép rời cuộc họp</button>
+            </form>
+          </div>
+          {% elif d.has_pending_leave_request %}
+          <div class="meeting-card meeting-mobile-section" data-meeting-mobile-section="attendance" style="margin-top:16px;">
+            <div class="meeting-empty">Đã gửi xin phép rời cuộc họp, đang chờ Chủ trì xử lý.</div>
+          </div>
+          {% endif %}
+
+          {% if d.is_host %}
+          <div class="meeting-card meeting-mobile-section" data-meeting-mobile-section="attendance" style="margin-top:16px;">
+            <h4>Danh sách xin rời cuộc họp</h4>
+            <div id="meetingLeaveRequestList">
+              {% for row in d.leave_requests %}
+                <div class="meeting-speaker-row" data-leave-request-id="{{ row.id }}" data-user-id="{{ row.user_id }}">
+                  <div>
+                    <strong>{{ row.user_name }}</strong>
+                    <div class="meeting-note">
+                      {{ row.request_status_label }}{% if row.note %} • {{ row.note }}{% endif %}
+                    </div>
+                  </div>
+                  {% if row.request_status == 'PENDING' %}
+                    <div class="meeting-actions">
+                      <form method="post" action="/meetings/{{ group.id }}/leave/{{ row.id }}/approve">
+                        <button type="submit" class="meeting-btn warn">Chấp thuận rời họp</button>
+                      </form>
+                      <form method="post" action="/meetings/{{ group.id }}/leave/{{ row.id }}/reject">
+                        <input type="hidden" name="response_note" value="">
+                        <button type="submit" class="meeting-btn secondary">Không chấp thuận</button>
+                      </form>
+                    </div>
+                  {% endif %}
+                </div>
+              {% else %}
+                <div class="meeting-note">Chưa có yêu cầu xin rời cuộc họp.</div>
+              {% endfor %}
+            </div>
+          </div>
+          {% endif %}
+
+          <div class="meeting-card meeting-mobile-section" data-meeting-mobile-section="speaker" style="margin-top:16px;">
+            <h4>{% if d.is_host %}Danh sách đăng ký phát biểu{% else %}Đăng ký phát biểu{% endif %}</h4>
+
+            <div
+              id="meetingSpeakerControlBox"
+              data-register-url="/meetings/{{ group.id }}/speaker/register"
+            >
+              {% if d.can_register_speaker %}
+                <form
+                  method="post"
+                  action="/meetings/{{ group.id }}/speaker/register"
+                  style="margin-bottom:12px;"
+                  id="meetingSpeakerFallbackForm"
+                >
+                  <input type="hidden" name="note" value="Tôi xin phát biểu.">
+                  <button
+                    class="meeting-btn gold"
+                    type="submit"
+                    id="meetingSpeakerOpenBtn"
+                    data-speaker-register-url="/meetings/{{ group.id }}/speaker/register"
+                  >Đăng ký phát biểu</button>
+                </form>
+
+                <div class="meeting-modal-backdrop" id="meetingSpeakerModal" aria-hidden="true">
+                  <div class="meeting-modal" role="dialog" aria-modal="true" aria-labelledby="meetingSpeakerModalTitle">
+                    <h4 class="meeting-modal-title" id="meetingSpeakerModalTitle">Đăng ký phát biểu</h4>
+                    <div class="meeting-modal-note">
+                      Nhập ngắn gọn nội dung đăng ký để Chủ trì biết anh/chị xin phát biểu. Ô “Nội dung trao đổi” bên trái vẫn được giữ nguyên, không bị mất khi gửi đăng ký.
+                    </div>
+                    <div class="meeting-field">
+                      <label>Nội dung đăng ký</label>
+                      <textarea id="meetingSpeakerNoteTextarea" placeholder="Ví dụ: Tôi xin phát biểu.">Tôi xin phát biểu.</textarea>
+                    </div>
+                    <div class="meeting-modal-actions">
+                      <button type="button" class="meeting-btn secondary" id="meetingSpeakerCancelBtn">Hủy</button>
+                      <button type="button" class="meeting-btn gold" id="meetingSpeakerSubmitBtn">Gửi đăng ký</button>
+                    </div>
+                  </div>
+                </div>
+              {% elif d.has_pending_speaker_request %}
+                <div class="meeting-empty" style="margin-bottom:12px;">
+                  Anh/chị đã đăng ký phát biểu, đang chờ Chủ trì cho phép.
+                </div>
+              {% elif d.is_host %}
+                <div class="meeting-note" style="margin-bottom:12px;">
+                  Chủ trì không cần đăng ký phát biểu. Chủ trì xử lý các yêu cầu phát biểu bên dưới.
+                </div>
+              {% endif %}
+            </div>
+
+            <div id="meetingSpeakerList">
+              {% for row in d.speaker_requests %}
+                <div class="meeting-speaker-row" data-speaker-id="{{ row.id }}">
+                  <div>
+                    <strong>#{{ row.queue_no }} {{ row.user_name }}</strong>
+                    <div class="meeting-note">{{ row.request_status_label }}{% if row.note %} • {{ row.note }}{% endif %}</div>
+                  </div>
+                  {% if d.is_host and row.request_status == 'PENDING' %}
+                    <div class="meeting-actions">
+                      <form method="post" action="/meetings/{{ group.id }}/speaker/{{ row.id }}/approve">
+                        <button type="submit" class="meeting-btn secondary">Cho phép phát biểu</button>
+                      </form>
+                      <form method="post" action="/meetings/{{ group.id }}/speaker/{{ row.id }}/move">
+                        <input type="hidden" name="direction" value="up">
+                        <button type="submit" class="meeting-btn secondary">↑</button>
+                      </form>
+                      <form method="post" action="/meetings/{{ group.id }}/speaker/{{ row.id }}/move">
+                        <input type="hidden" name="direction" value="down">
+                        <button type="submit" class="meeting-btn secondary">↓</button>
+                      </form>
+                    </div>
+                  {% endif %}
+                </div>
+              {% else %}
+                <div class="meeting-note">Chưa có đăng ký phát biểu.</div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </div>
+    {% else %}
+      <div class="meeting-card">
+        <h3>Chưa chọn cuộc họp</h3>
+        <div class="meeting-note">Chọn một cuộc họp ở danh sách bên trái hoặc tạo cuộc họp mới (Theo thẩm quyền).</div>
+      </div>
+    {% endif %}
+  </section>
+</div>
+
+<script>
+  window.HVGL_MEETING_CONFIG = {
+    selectedId: "{{ selected_id or '' }}"
+  };
+</script>
+<script>
+  (function () {
+    "use strict";
+
+    function initMeetingMobileTabs() {
+      var tabsBox = document.getElementById("meetingMobileTabs");
+      if (!tabsBox) {
+        return;
+      }
+
+      var tabs = Array.prototype.slice.call(tabsBox.querySelectorAll("[data-meeting-mobile-tab]"));
+      var sections = Array.prototype.slice.call(document.querySelectorAll("[data-meeting-mobile-section]"));
+      if (!tabs.length || !sections.length) {
+        return;
+      }
+
+      var media = window.matchMedia("(max-width: 900px)");
+
+      function setActive(name) {
+        tabs.forEach(function (tab) {
+          tab.classList.toggle("is-active", tab.getAttribute("data-meeting-mobile-tab") === name);
+        });
+
+        sections.forEach(function (section) {
+          var sectionName = section.getAttribute("data-meeting-mobile-section") || "";
+          section.classList.toggle("is-mobile-hidden", media.matches && sectionName !== name);
+        });
+      }
+
+      function syncMode() {
+        if (media.matches) {
+          var active = tabsBox.querySelector(".meeting-mobile-tab.is-active");
+          setActive(active ? active.getAttribute("data-meeting-mobile-tab") : "info");
+        } else {
+          sections.forEach(function (section) {
+            section.classList.remove("is-mobile-hidden");
+          });
+        }
+      }
+
+      tabs.forEach(function (tab) {
+        tab.addEventListener("click", function () {
+          setActive(tab.getAttribute("data-meeting-mobile-tab") || "info");
+          var detailPane = document.getElementById("meetingDetailPane");
+          if (detailPane) {
+            detailPane.scrollIntoView({ behavior: "smooth", block: "start" });
+          }
+        });
+      });
+
+      if (media.addEventListener) {
+        media.addEventListener("change", syncMode);
+      } else if (media.addListener) {
+        media.addListener(syncMode);
+      }
+
+      syncMode();
+    }
+
+    document.addEventListener("DOMContentLoaded", initMeetingMobileTabs);
+    document.addEventListener("hvgl:meeting-detail-refreshed", initMeetingMobileTabs);
+  })();
+</script>
+<script src="/static/meetings/meeting.js"></script>
+{% endblock %}

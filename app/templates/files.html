@@ -1,0 +1,400 @@
+{% extends "base.html" %}
+{% block content %}
+
+<style>
+  .files-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .files-toolbar {
+    display: grid;
+    grid-template-columns: 1.4fr 220px 180px 140px auto;
+    gap: 12px;
+    align-items: end;
+    margin-bottom: 16px;
+  }
+
+  .files-toolbar label,
+  .upload-form label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+
+  .files-toolbar input,
+  .files-toolbar select,
+  .upload-form input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px 10px;
+  }
+
+  .files-actions a,
+  .files-actions button {
+    white-space: nowrap;
+  }
+
+  .type-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: #eef2ff;
+    color: #243b7a;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .preview-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    z-index: 9999;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+
+  .preview-modal.show {
+    display: flex;
+  }
+
+  .preview-box {
+    width: min(1100px, 96vw);
+    height: min(82vh, 900px);
+    background: #fff;
+    border-radius: 12px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .preview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    border-bottom: 1px solid #ddd;
+    gap: 16px;
+  }
+
+  .preview-body {
+    flex: 1;
+    background: #f8f9fb;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: auto;
+  }
+
+  .preview-body iframe,
+  .preview-body video,
+  .preview-body img {
+    max-width: 100%;
+    max-height: 100%;
+    border: none;
+  }
+
+  .preview-empty {
+    padding: 24px;
+    color: #666;
+    text-align: center;
+    line-height: 1.6;
+  }
+
+  .pagination {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-top: 16px;
+  }
+
+  .pagination a,
+  .pagination span {
+    padding: 6px 10px;
+    border: 1px solid #d8d8d8;
+    border-radius: 6px;
+    text-decoration: none;
+  }
+
+  .pagination .current {
+    background: #e9f1ff;
+    border-color: #7aa2ff;
+    font-weight: 700;
+  }
+
+  .muted-note {
+    color: #555;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  .disabled-action {
+    color: #999;
+    cursor: not-allowed;
+  }
+
+  @media (max-width: 1100px) {
+    .files-toolbar {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+
+  @media (max-width: 700px) {
+    .files-toolbar {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<div class="files-grid">
+  <div class="panel">
+    <h2>Kho tài liệu</h2>
+    <p><strong>Kho tài liệu sử dụng chung của Ban Kiểm soát nội bộ</strong></p>
+
+    {% if msg %}
+      <div style="margin-bottom:12px; padding:10px; border:1px solid #b7e1cd; background:#f0fff4; border-radius:6px;">
+        {{ msg }}
+      </div>
+    {% endif %}
+
+    {% if error %}
+      <div style="margin-bottom:12px; padding:10px; border:1px solid #f5c2c7; background:#fff5f5; border-radius:6px; color:#8a1f2b;">
+        {{ error }}
+      </div>
+    {% endif %}
+
+    {% if can_upload_files %}
+      <form method="post" action="/documents/upload" enctype="multipart/form-data" class="upload-form">
+        <label>Chọn file</label>
+        <input type="file" name="upfile" required accept="{{ accept_types }}">
+
+        <div style="margin-top:12px;">
+          <button type="submit">Tải lên</button>
+        </div>
+      </form>
+
+      <div class="muted-note" style="margin-top:8px;">
+        Hỗ trợ các loại tệp: Word, Excel, PDF, ảnh và video.<br>
+        Tài liệu tải lên được lưu trong phạm vi <strong>Ban Kiểm soát nội bộ</strong>.
+      </div>
+    {% else %}
+      <div class="muted-note">
+        Tài khoản hiện tại không có quyền tải tài liệu lên Kho tài liệu KSNB.
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="panel">
+    <h3>Danh sách tài liệu</h3>
+
+    <form method="get" action="/documents" class="files-toolbar">
+      <div>
+        <label>Tìm kiếm nhanh theo tên file</label>
+        <input type="text" name="q" value="{{ q }}" placeholder="Nhập tên file cần tìm...">
+      </div>
+
+      <div>
+        <label>Lọc theo loại file</label>
+        <select name="kind">
+          <option value="all" {% if kind == 'all' %}selected{% endif %}>Tất cả</option>
+          <option value="document" {% if kind == 'document' %}selected{% endif %}>Word</option>
+          <option value="spreadsheet" {% if kind == 'spreadsheet' %}selected{% endif %}>Excel</option>
+          <option value="pdf" {% if kind == 'pdf' %}selected{% endif %}>PDF</option>
+          <option value="image" {% if kind == 'image' %}selected{% endif %}>Ảnh</option>
+          <option value="video" {% if kind == 'video' %}selected{% endif %}>Video</option>
+        </select>
+      </div>
+
+      <div>
+        <label>Sắp xếp theo</label>
+        <select name="sort">
+          <option value="uploaded_at" {% if sort == 'uploaded_at' %}selected{% endif %}>Ngày tải</option>
+          <option value="name" {% if sort == 'name' %}selected{% endif %}>Tên file</option>
+          <option value="type" {% if sort == 'type' %}selected{% endif %}>Loại file</option>
+          <option value="owner" {% if sort == 'owner' %}selected{% endif %}>Người tải</option>
+          <option value="size" {% if sort == 'size' %}selected{% endif %}>Dung lượng</option>
+        </select>
+      </div>
+
+      <div>
+        <label>Thứ tự</label>
+        <select name="direction">
+          <option value="desc" {% if direction == 'desc' %}selected{% endif %}>Giảm dần</option>
+          <option value="asc" {% if direction == 'asc' %}selected{% endif %}>Tăng dần</option>
+        </select>
+      </div>
+
+      <div style="display:flex; gap:8px;">
+        <button type="submit">Tìm kiếm</button>
+        <a href="/documents">Xóa lọc</a>
+      </div>
+    </form>
+
+    <div style="margin-bottom:10px; color:#555;">
+      Tổng số file phù hợp: <strong>{{ total_files }}</strong>
+    </div>
+
+    {% if rows %}
+      <div class="table-responsive">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Tên file</th>
+              <th>Phạm vi</th>
+              <th>Loại file</th>
+              <th>Người tải</th>
+              <th>Ngày tải</th>
+              <th>Dung lượng</th>
+              <th style="width:260px;">Thao tác</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in rows %}
+            <tr>
+              <td>
+                <div style="font-weight:600;">{{ row.original_name }}</div>
+                {% if row.file_ext %}
+                  <div style="font-size:12px; color:#666;">.{{ row.file_ext|lower }}</div>
+                {% endif %}
+              </td>
+              <td>
+                <span class="type-badge">{{ row.scope_label }}</span>
+                <div style="font-size:12px; color:#666; margin-top:4px;">{{ row.scope_name }}</div>
+              </td>
+              <td>
+                <span class="type-badge">{{ row.file_kind_label }}</span>
+              </td>
+              <td>{{ row.owner_name or "" }}</td>
+              <td>{{ row.uploaded_at_display }}</td>
+              <td>{{ row.size_display }}</td>
+              <td class="files-actions">
+                {% if row.can_preview_inline %}
+                  <a
+                    href="#"
+                    class="btn-preview"
+                    data-url="{{ row.preview_url }}"
+                    data-kind="{{ row.preview_kind }}"
+                    data-name="{{ row.original_name }}"
+                  >Xem</a>
+                  |
+                {% else %}
+                  <a href="/documents/view/{{ row.id }}" target="_blank">Mở</a>
+                  |
+                {% endif %}
+
+                <a href="/documents/download/{{ row.id }}">Tải xuống</a>
+                |
+
+                {% if row.can_delete %}
+                  <form
+                    method="post"
+                    action="/documents/delete/{{ row.id }}"
+                    style="display:inline;"
+                    onsubmit="return confirm('Xác nhận xóa tệp này?');"
+                  >
+                    <button type="submit" style="padding:0; border:none; background:none; color:#c00; cursor:pointer;">
+                      Xóa
+                    </button>
+                  </form>
+                {% else %}
+                  <span class="disabled-action">Không xóa</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      {% if total_pages > 1 %}
+        <div class="pagination">
+          {% set prev_page = page - 1 %}
+          {% set next_page = page + 1 %}
+
+          {% if page > 1 %}
+            <a href="/documents?q={{ q }}&kind={{ kind }}&sort={{ sort }}&direction={{ direction }}&per_page={{ per_page }}&page=1">Đầu</a>
+            <a href="/documents?q={{ q }}&kind={{ kind }}&sort={{ sort }}&direction={{ direction }}&per_page={{ per_page }}&page={{ prev_page }}">Trước</a>
+          {% endif %}
+
+          <span class="current">Trang {{ page }}/{{ total_pages }}</span>
+
+          {% if page < total_pages %}
+            <a href="/documents?q={{ q }}&kind={{ kind }}&sort={{ sort }}&direction={{ direction }}&per_page={{ per_page }}&page={{ next_page }}">Sau</a>
+            <a href="/documents?q={{ q }}&kind={{ kind }}&sort={{ sort }}&direction={{ direction }}&per_page={{ per_page }}&page={{ total_pages }}">Cuối</a>
+          {% endif %}
+        </div>
+      {% endif %}
+    {% else %}
+      <p>Không có tài liệu phù hợp.</p>
+    {% endif %}
+  </div>
+</div>
+
+<div id="previewModal" class="preview-modal">
+  <div class="preview-box">
+    <div class="preview-header">
+      <div id="previewTitle" style="font-weight:700;">Xem tài liệu</div>
+      <button type="button" onclick="closePreview()">Đóng</button>
+    </div>
+    <div class="preview-body" id="previewBody">
+      <div class="preview-empty">Không có nội dung xem trước.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const previewModal = document.getElementById("previewModal");
+  const previewBody = document.getElementById("previewBody");
+  const previewTitle = document.getElementById("previewTitle");
+
+  function closePreview() {
+    previewModal.classList.remove("show");
+    previewBody.innerHTML = '<div class="preview-empty">Không có nội dung xem trước.</div>';
+  }
+
+  document.querySelectorAll(".btn-preview").forEach((btn) => {
+    btn.addEventListener("click", function (e) {
+      e.preventDefault();
+
+      const url = this.dataset.url;
+      const kind = this.dataset.kind;
+      const name = this.dataset.name || "Xem tài liệu";
+
+      previewTitle.textContent = name;
+
+      if (kind === "pdf") {
+        previewBody.innerHTML = '<iframe src="' + url + '" style="width:100%; height:100%;"></iframe>';
+      } else if (kind === "image") {
+        previewBody.innerHTML = '<img src="' + url + '" alt="' + name + '">';
+      } else if (kind === "video") {
+        previewBody.innerHTML =
+          '<video controls style="width:100%; height:100%;">' +
+          '<source src="' + url + '">' +
+          'Trình duyệt không hỗ trợ video.' +
+          '</video>';
+      } else {
+        previewBody.innerHTML = '<div class="preview-empty">Loại tệp này chưa hỗ trợ xem trước trực tiếp. Vui lòng tải xuống để xem.</div>';
+      }
+
+      previewModal.classList.add("show");
+    });
+  });
+
+  previewModal.addEventListener("click", function (e) {
+    if (e.target === previewModal) {
+      closePreview();
+    }
+  });
+
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") {
+      closePreview();
+    }
+  });
+</script>
+
+{% endblock %}

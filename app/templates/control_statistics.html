@@ -1,0 +1,164 @@
+{% extends 'base.html' %}
+{% block content %}
+<style>
+  .control-stat-ui-font {
+    font-family: inherit;
+    font-weight: 700;
+  }
+
+  .control-stat-btn-primary {
+    display: inline-block;
+    background: #0b5cad !important;
+    color: #ffffff !important;
+    border: 1px solid #084f8f !important;
+    border-radius: 8px;
+    padding: 8px 12px;
+    text-decoration: none;
+    line-height: 1.2;
+    cursor: pointer;
+  }
+
+  .control-stat-btn-primary:hover {
+    background: #084f8f !important;
+    color: #ffffff !important;
+    text-decoration: none;
+  }
+
+  .control-stat-btn-yellow {
+    display: inline-block;
+    background: #fff3bf !important;
+    color: #0f5fa8 !important;
+    border: 1px solid #f0c36d !important;
+    border-radius: 8px;
+    padding: 8px 12px;
+    text-decoration: none;
+    line-height: 1.2;
+  }
+
+  .control-stat-btn-yellow:hover {
+    background: #ffe8a3 !important;
+    color: #084f8f !important;
+    text-decoration: none;
+  }
+
+  .control-stat-btn-back {
+    display: inline-block;
+    background: #dbeafe !important;
+    color: #075985 !important;
+    border: 1px solid #93c5fd !important;
+    border-radius: 8px;
+    padding: 8px 12px;
+    text-decoration: none;
+    line-height: 1.2;
+  }
+
+  .control-stat-btn-back:hover {
+    background: #bfdbfe !important;
+    color: #075985 !important;
+    text-decoration: none;
+  }
+
+  .control-stat-quick-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .control-stat-report {
+    background: #ffffff;
+    border: 1px solid #d9e6f2;
+    border-radius: 12px;
+    padding: 18px;
+    line-height: 1.6;
+  }
+
+  .control-stat-report-title {
+    text-align: center;
+    font-weight: 800;
+    text-transform: uppercase;
+    margin: 6px 0;
+  }
+
+  .control-stat-section-title {
+    margin-top: 16px;
+    font-weight: 800;
+    color: #073763;
+    text-transform: uppercase;
+  }
+
+  .control-stat-subtitle {
+    margin-top: 8px;
+    font-weight: 700;
+  }
+
+  .control-stat-line {
+    margin-left: 18px;
+  }
+
+  .control-stat-number {
+    font-weight: 700;
+    color: #0b5cad;
+  }
+</style>
+
+<div class="page-head">
+  <h2>Thống kê kiểm soát thu, chi</h2>
+  <a class="secondary-link control-stat-ui-font control-stat-btn-back" href="javascript:history.back()">Back</a>
+</div>
+
+<div class="panel">
+  <form method="get" action="/control-statistics" class="grid3">
+    <div>
+      <label>Từ ngày</label>
+      <input type="date" name="start_date" value="{{ start_date }}">
+    </div>
+
+    <div>
+      <label>Đến ngày</label>
+      <input type="date" name="end_date" value="{{ end_date }}">
+    </div>
+
+    <div style="display:flex;align-items:flex-end;gap:8px;">
+      <button class="primary control-stat-ui-font control-stat-btn-primary" type="submit">Thống kê</button>
+      <a class="secondary-link control-stat-ui-font control-stat-btn-yellow" href="/control-statistics/export.txt?start_date={{ start_date }}&end_date={{ end_date }}">Xuất báo cáo TXT</a>
+    </div>
+
+    <div style="grid-column:1/-1;">
+      <div class="muted">Chọn nhanh thời gian thống kê:</div>
+      <div class="control-stat-quick-links">
+        {% for key, item in quick_ranges.items() %}
+        <a class="secondary-link control-stat-ui-font control-stat-btn-back" href="/control-statistics?start_date={{ item.start_date }}&end_date={{ item.end_date }}">{{ item.label }}</a>
+        {% endfor %}
+      </div>
+    </div>
+  </form>
+</div>
+
+<div class="panel control-stat-report">
+  <div style="text-align:center;font-weight:700;">CÔNG TY TNHH BỆNH VIỆN HÙNG VƯƠNG GIA LAI</div>
+  <div style="text-align:center;font-weight:700;">BAN KIỂM SOÁT NỘI BỘ</div>
+
+  <div class="control-stat-report-title">BÁO CÁO THỐNG KÊ KIỂM SOÁT THU, CHI</div>
+  <div style="text-align:center;">
+    Thời gian thống kê: từ <b>{{ start_date_text }}</b> đến <b>{{ end_date_text }}</b>
+  </div>
+
+  <div class="control-stat-section-title">I. KIỂM SOÁT HỒ SƠ THU, CHI QUAN TRỌNG</div>
+
+  <div class="control-stat-subtitle">1. Hồ sơ đề nghị thanh toán</div>
+  <div class="control-stat-line">- Số chứng từ đã kiểm soát: <span class="control-stat-number">{{ stats.dntt_document_count }}</span></div>
+  <div class="control-stat-line">- Tổng số tiền đã kiểm soát: <span class="control-stat-number">{{ money_text(stats.dntt_checked_amount) }}</span> đồng</div>
+
+  <div class="control-stat-subtitle">2. Hồ sơ vốn tự có</div>
+  <div class="control-stat-line">- Số chứng từ đã kiểm soát: <span class="control-stat-number">{{ stats.own_capital_document_count }}</span></div>
+  <div class="control-stat-line">- Tổng số tiền đã kiểm soát: <span class="control-stat-number">{{ money_text(stats.own_capital_checked_amount) }}</span> đồng</div>
+
+  <div class="control-stat-section-title">II. KIỂM SOÁT THU, CHI TIỀN MẶT</div>
+  <div class="control-stat-line">- Số phiếu thu tiền mặt đã kiểm soát: <span class="control-stat-number">{{ stats.receipt_count }}</span></div>
+  <div class="control-stat-line">- Tổng số thu bằng tiền mặt đã kiểm soát: <span class="control-stat-number">{{ money_text(stats.cash_revenue_total) }}</span> đồng</div>
+  <div class="control-stat-line">- Tổng số thu không dùng tiền mặt đã kiểm soát: <span class="control-stat-number">{{ money_text(stats.non_cash_revenue_total) }}</span> đồng</div>
+  <div class="control-stat-line">- Số phiếu chi đã kiểm soát: <span class="control-stat-number">{{ stats.expense_count }}</span></div>
+  <div class="control-stat-line">- Tổng số chi bằng tiền mặt đã kiểm soát: <span class="control-stat-number">{{ money_text(stats.cash_expense_total) }}</span> đồng</div>
+</div>
+{% endblock %}

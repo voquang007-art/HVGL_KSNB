@@ -1,0 +1,233 @@
+{% extends 'base.html' %}
+{% block content %}
+<style>
+  .admin-user-notice {
+    margin: 10px 0 14px 0;
+    padding: 10px 12px;
+    border: 1px solid #86efac;
+    border-radius: 10px;
+    background: #f0fdf4;
+    color: #166534;
+    font-weight: 600;
+  }
+
+  .admin-user-row-saved {
+    background: #f0fdf4;
+    outline: 2px solid #86efac;
+  }
+
+  .admin-user-form {
+    display: contents;
+  }
+
+  .admin-user-input,
+  .admin-user-select {
+    width: 100%;
+    min-width: 150px;
+    box-sizing: border-box;
+  }
+
+  .admin-user-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .admin-user-save-btn {
+    background: #dbeafe !important;
+    color: #1e3a8a !important;
+    border: 1px solid #93c5fd !important;
+    font-weight: 700;
+  }
+
+  .admin-user-save-btn:hover {
+    background: #bfdbfe !important;
+  }
+
+  .admin-user-saved-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: #dcfce7;
+    color: #166534;
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .admin-user-admin-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: #dbeafe;
+    color: #1e3a8a;
+    font-size: 12px;
+    font-weight: 800;
+    white-space: nowrap;
+  }
+
+  .admin-create-admin-panel {
+    margin: 14px 0;
+    padding: 14px;
+    border: 1px solid #fed7aa;
+    border-radius: 12px;
+    background: #fff7ed;
+  }
+
+  .admin-create-admin-panel h3 {
+    margin-top: 0;
+    color: #9a3412;
+  }
+
+  .admin-create-admin-grid {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr 1fr 1fr auto;
+    gap: 10px;
+    align-items: end;
+  }
+
+  .admin-create-admin-warning {
+    color: #9a3412;
+    font-weight: 700;
+  }
+
+  .admin-create-admin-btn {
+    background: #f97316 !important;
+    color: #ffffff !important;
+    border: 1px solid #ea580c !important;
+    font-weight: 800;
+  }
+
+  @media (max-width: 900px) {
+    .admin-create-admin-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<h2>Quản trị người dùng</h2>
+<p class="muted">
+  Người dùng tự đăng ký không qua xét duyệt. Admin được sửa họ tên, gán đơn vị, vị trí và tình trạng tài khoản tại đây.
+  Quyền Admin không cấp đè lên tài khoản nghiệp vụ; nếu cần, hãy tạo tài khoản Admin riêng để tránh mất vị trí cũ.
+</p>
+
+<div class="admin-create-admin-panel">
+  <h3>Tạo tài khoản Admin riêng</h3>
+  <p class="muted">
+    Dùng chức năng này khi cần cấp quyền quản trị cho một người nhưng vẫn giữ nguyên tài khoản/vị trí nghiệp vụ hiện tại của người đó.
+    Không dùng để thay thế thao tác gán vị trí thông thường.
+  </p>
+  <form method="post" action="/admin/users/create-admin-account" class="admin-create-admin-grid">
+    <div>
+      <label>Người dùng gốc</label>
+      <select name="source_user_id" required>
+        <option value="">-- Chọn người dùng --</option>
+        {% for u in users %}
+        <option value="{{ u.id }}">{{ u.full_name }} - {{ u.username }} - {{ role_labels.get(u.role_code, u.role_code) }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div>
+      <label>Tài khoản Admin mới</label>
+      <input name="admin_username" placeholder="vd: nguyenvana.admin" required>
+    </div>
+
+    <div>
+      <label>Mật khẩu Admin mới</label>
+      <input name="admin_password" type="password" minlength="10" required>
+    </div>
+
+    <div>
+      <label>Gõ: TOI XAC NHAN</label>
+      <input name="confirm_text" placeholder="TOI XAC NHAN" required>
+    </div>
+
+    <div>
+      <button
+        class="secondary admin-create-admin-btn"
+        type="submit"
+        onclick="return confirm('Xác nhận tạo tài khoản Admin riêng? Tài khoản này có quyền quản trị toàn bộ hệ thống.');"
+      >
+        Tạo Admin riêng
+      </button>
+    </div>
+  </form>
+  <p class="admin-create-admin-warning">
+    Lưu ý: Không tạo nhiều tài khoản Admin nếu không cần thiết. Tài khoản Admin phải dùng mật khẩu mạnh và chỉ giao cho người có trách nhiệm quản trị.
+  </p>
+</div>
+
+<table class="table compact">
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>Tài khoản</th>
+      <th>Họ tên</th>
+      <th>Đơn vị</th>
+      <th>Vị trí</th>
+      <th>Tình trạng tài khoản</th>
+      <th>Cập nhật</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for u in users %}
+    <tr class="{% if saved_user_id and saved_user_id == u.id|string %}admin-user-row-saved{% endif %}">
+      <form method="post" action="/admin/users/{{ u.id }}/assign" class="admin-user-form">
+        <td>{{ u.id }}</td>
+
+        <td>{{ u.username }}</td>
+
+        <td>
+          <input
+            class="admin-user-input"
+            name="full_name"
+            value="{{ u.full_name or '' }}"
+            required
+          >
+        </td>
+
+        <td>
+          <select class="admin-user-select" name="unit_code">
+            {% for code, label in unit_labels.items() %}
+            <option value="{{ code }}" {% if u.unit_code == code %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </td>
+
+        <td>
+          <select class="admin-user-select" name="role_code">
+            {% for code, label in role_labels.items() %}
+            <option value="{{ code }}" {% if u.role_code == code %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </td>
+
+        <td>
+          <select class="admin-user-select" name="is_active">
+            <option value="1" {% if u.is_active %}selected{% endif %}>Hoạt động</option>
+            <option value="0" {% if not u.is_active %}selected{% endif %}>Khóa</option>
+          </select>
+        </td>
+
+        <td>
+          <div class="admin-user-actions">
+            <button class="secondary admin-user-save-btn" type="submit">Lưu thay đổi</button>
+
+            {% if u.role_code == 'ADMIN' %}
+            <span class="admin-user-admin-badge">Admin</span>
+            {% endif %}
+
+            {% if saved_user_id and saved_user_id == u.id|string %}
+            <span class="admin-user-saved-badge">Đã lưu</span>
+            {% endif %}
+          </div>
+        </td>
+      </form>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

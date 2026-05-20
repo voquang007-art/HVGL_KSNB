@@ -1,0 +1,158 @@
+{% extends 'base.html' %}
+{% block content %}
+<style>
+  .voucher-title-font {
+    font-family: inherit;
+    font-weight: 700;
+  }
+
+  .voucher-new-alert {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 12px 0;
+    padding: 10px 12px;
+    border: 1px solid #f0c36d;
+    border-radius: 10px;
+    background: #fff3bf;
+    color: #7c2d12;
+    font-weight: 700;
+  }
+
+  .voucher-new-alert-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 26px;
+    height: 24px;
+    padding: 0 8px;
+    border-radius: 999px;
+    background: #dc2626;
+    color: #ffffff;
+    font-size: 13px;
+    font-weight: 800;
+  }
+
+  .voucher-new-row {
+    background: #fde2e7;
+  }
+
+  .voucher-new-row td {
+    border-color: #f3b6c1;
+  }
+
+  .voucher-new-inline-badge {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 6px;
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: #dc2626;
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 800;
+  }
+</style>
+<div class="page-head">
+  {% if user.role_code in ['TONG_GIAM_DOC','PHO_TGD_THUONG_TRUC','PHO_TONG_GIAM_DOC'] %}
+  <h2>Danh sách Phiếu kiểm soát hồ sơ thu, chi quan trọng trình Hội đồng thành viên</h2>
+  {% else %}
+  <h2>Phiếu kiểm soát hồ sơ thu, chi quan trọng</h2>
+  {% endif %}
+  <div>
+    {% if user.role_code in ['ADMIN','TRUONG_BAN_KSNB','PHO_TRUONG_BAN_KSNB','NHAN_VIEN_KSNB'] %}
+    <a class="primary-link voucher-title-font" href="/vouchers/new">+ Lập Phiếu</a>
+    {% endif %}
+    <a class="secondary-link" href="javascript:history.back()">Back</a>
+  </div>
+</div>
+
+<div class="panel">
+  <form method="get" action="/vouchers" class="grid3">
+    <div>
+      <label>Năm</label>
+      <select name="year">
+        <option value="">Tất cả năm</option>
+        {% for y in years %}
+        <option value="{{ y.year }}" {% if selected_year == y.year %}selected{% endif %}>{{ y.year }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label>Tháng</label>
+      <select name="month">
+        <option value="">Tất cả tháng</option>
+        {% for m in months %}
+        <option value="{{ m }}" {% if selected_month == m %}selected{% endif %}>Tháng {{ m }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label>Ngày</label>
+      <select name="day">
+        <option value="">Tất cả ngày</option>
+        {% for d in days %}
+        <option value="{{ d }}" {% if selected_day == d %}selected{% endif %}>Ngày {{ d }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div style="grid-column:1/-1;">
+      <button class="primary voucher-title-font" type="submit">Lọc danh sách</button>
+      <a class="secondary-link voucher-title-font" href="/vouchers">Bỏ lọc</a>
+    </div>
+  </form>
+</div>
+
+{% if voucher_new_count %}
+<div class="voucher-new-alert">
+  <span class="voucher-new-alert-badge">{{ voucher_new_count if voucher_new_count <= 99 else '99+' }}</span>
+  <span>Phiếu kiểm soát mới chờ xử lý.</span>
+</div>
+{% endif %}
+
+<table class="table">
+  <thead>
+    <tr><th>Mã</th><th>Tên hồ sơ</th><th>Người tạo</th><th>Số tiền</th><th>Trạng thái</th><th>Thao tác</th></tr>
+  </thead>
+  <tbody>
+  {% for v in vouchers %}
+    <tr class="{% if v.is_new_for_current_user %}voucher-new-row{% endif %}">
+      <td>
+        {{ v.code }}
+        {% if v.is_new_for_current_user %}
+        <span class="voucher-new-inline-badge">Mới</span>
+        {% endif %}
+      </td>
+      <td>{{ v.title }}</td>
+      <td>{{ v.creator_name }}</td>
+      <td class="num">{{ '{:,.0f}'.format(v.total_amount or 0).replace(',', '.') }}</td>
+      <td>
+        <span class="badge">{{ status_labels.get(v.status, v.status) }}</span>
+        {% if v.status == 'DRAFT' %}
+        <br><span class="muted">Bản lưu nháp</span>
+        {% endif %}
+      </td>
+      <td>
+        {% if user.role_code in ['TONG_GIAM_DOC','PHO_TGD_THUONG_TRUC','PHO_TONG_GIAM_DOC'] %}
+        <a href="/vouchers/{{ v.id }}/print">Xem</a>
+        {% else %}
+        <a href="/vouchers/{{ v.id }}">Xem</a>
+        {% endif %}
+        {% if v.status not in ['SUBMITTED_TO_BOARD','BOARD_VIEWED','BOARD_SAVED'] and (user.role_code == 'ADMIN' or v.created_by == user.id) %}
+          |
+          <a href="/vouchers/{{ v.id }}/edit">Sửa</a>
+        {% endif %}
+        {% if v.status == 'DRAFT' and (user.role_code == 'ADMIN' or v.created_by == user.id) %}
+          |
+          <form method="post" action="/vouchers/{{ v.id }}/delete" style="display:inline;" onsubmit="return confirm('Anh chắc chắn muốn xóa phiếu này? Thao tác này không thể hoàn tác.');">
+            <button type="submit" class="link-button">Xóa</button>
+          </form>
+        {% endif %}
+      </td>
+    </tr>
+  {% else %}
+    <tr><td colspan="6" class="empty">Chưa có Phiếu.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

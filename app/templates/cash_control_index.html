@@ -1,0 +1,1640 @@
+{% extends 'base.html' %}
+{% block content %}
+<style>
+  .cash-collapsible-panel > h3 {
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 12px;
+    margin: -4px -4px 12px -4px;
+    border-radius: 10px;
+    background: #eef6ff;
+    border: 1px solid #cfe4ff;
+    color: #073763;
+  }
+
+  .cash-collapsible-panel > h3::after {
+    content: "Ẩn ▲";
+    font-size: 13px;
+    font-weight: 600;
+    color: #0b5cad;
+    white-space: nowrap;
+  }
+
+  .cash-collapsible-panel.is-collapsed > h3 {
+    margin-bottom: 0;
+  }
+
+  .cash-collapsible-panel.is-collapsed > h3::after {
+    content: "Hiện ▼";
+  }
+
+  .cash-collapsible-panel.is-collapsed > :not(h3) {
+    display: none !important;
+  }
+
+  .cash-control-ui-font {
+    font-family: inherit;
+    font-weight: 700;
+  }
+
+  .cash-btn-confirm-import {
+    background: #d9f7e5 !important;
+    color: #064e3b !important;
+    border: 1px solid #8fd9af !important;
+  }
+
+  .cash-btn-load-dataset {
+    background: #7dd3fc !important;
+    color: #b00000 !important;
+    border: 1px solid #38bdf8 !important;
+  }
+
+  .cash-btn-soft-yellow-blue {
+    background: #fff3bf !important;
+    color: #0f5fa8 !important;
+    border: 1px solid #f0c36d !important;
+  }
+
+  .cash-btn-back {
+    display: inline-block;
+    background: #dbeafe !important;
+    color: #075985 !important;
+    border: 1px solid #93c5fd !important;
+    border-radius: 8px;
+    padding: 8px 12px;
+    text-decoration: none;
+    line-height: 1.2;
+  }
+
+  .cash-btn-back:hover {
+    background: #bfdbfe !important;
+    color: #075985 !important;
+    text-decoration: none;
+  }
+
+  .cash-new-alert {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 12px 0;
+    padding: 10px 12px;
+    border: 1px solid #f0c36d;
+    border-radius: 10px;
+    background: #fff3bf;
+    color: #7c2d12;
+    font-weight: 700;
+  }
+
+  .cash-new-alert-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 26px;
+    height: 24px;
+    padding: 0 8px;
+    border-radius: 999px;
+    background: #dc2626;
+    color: #ffffff;
+    font-size: 13px;
+    font-weight: 800;
+  }
+
+  .cash-new-row {
+    background: #fde2e7;
+  }
+
+  .cash-new-row td {
+    border-color: #f3b6c1;
+  }
+
+  .cash-new-inline-badge {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 6px;
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: #dc2626;
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 800;
+  }
+</style>
+
+<div class="page-head">
+  <h2>Kiểm soát thu, chi tiền mặt</h2>
+  <a class="secondary-link cash-control-ui-font cash-btn-back" href="javascript:history.back()">Back</a>
+</div>
+
+{% if user.role_code not in ['TONG_GIAM_DOC','PHO_TGD_THUONG_TRUC','PHO_TONG_GIAM_DOC'] %}
+<div class="panel">
+  <div class="cash-tabs">
+    <a class="cash-tab cash-control-ui-font {% if active_main_tab == 'summary' %}active{% endif %}" href="/cash-control{% if selected_batch %}/{{ selected_batch.id }}{% endif %}?main_tab=summary&summary_tab={{ active_summary_tab or 'his' }}">1. Tổng hợp số liệu</a>
+    <a class="cash-tab cash-control-ui-font {% if active_main_tab == 'reconcile' %}active{% endif %}" href="/cash-control{% if selected_batch %}/{{ selected_batch.id }}{% endif %}?main_tab=reconcile">2. Đối chiếu số liệu</a>
+    <a class="cash-tab cash-control-ui-font {% if active_main_tab == 'voucher' %}active{% endif %}" href="/cash-control{% if selected_batch %}/{{ selected_batch.id }}{% endif %}?main_tab=voucher">3. Lập phiếu kiểm soát</a>
+  </div>
+</div>
+{% endif %}
+
+{% if editing_cash_voucher %}
+<div class="panel" style="border-left:4px solid #0b5cad;">
+  <b>Phiếu đang sửa:</b> {{ editing_cash_voucher.code }} - {{ editing_cash_voucher.title }}
+  <span class="badge">{{ cash_control_status_labels.get(editing_cash_voucher.status, editing_cash_voucher.status) }}</span>
+  <div style="margin-top:8px;">
+    <a class="secondary-link cash-control-ui-font" href="/cash-control/vouchers/{{ editing_cash_voucher.id }}">Quay lại Phiếu đang sửa</a>
+    |
+    <a class="secondary-link cash-control-ui-font" target="_blank" href="/cash-control/vouchers/{{ editing_cash_voucher.id }}/print">In phiếu</a>
+  </div>
+</div>
+{% endif %}
+
+{% if active_main_tab == 'summary' %}
+<div class="panel">
+  <div class="cash-subtabs">
+    <a class="cash-subtab cash-control-ui-font {% if active_summary_tab == 'his' %}active{% endif %}" href="/cash-control{% if selected_batch %}/{{ selected_batch.id }}{% endif %}?main_tab=summary&summary_tab=his">Tổng hợp doanh thu trên HIS</a>
+    <a class="cash-subtab cash-control-ui-font {% if active_summary_tab == 'cashbook' %}active{% endif %}" href="/cash-control{% if selected_batch %}/{{ selected_batch.id }}{% endif %}?main_tab=summary&summary_tab=cashbook">Tổng hợp Sổ quỹ tiền mặt</a>
+    <a class="cash-subtab cash-control-ui-font {% if active_summary_tab == 'accounting' %}active{% endif %}" href="/cash-control{% if selected_batch %}/{{ selected_batch.id }}{% endif %}?main_tab=summary&summary_tab=accounting">Tổng hợp số báo cáo của Kế toán</a>
+  </div>
+</div>
+
+  {% if active_summary_tab == 'his' %}
+  <div class="panel">
+    <h3>Tổng hợp doanh thu trên HIS</h3>
+    <p class="muted">
+      Import bảng tổng hợp tiền để thống kê theo mã nhân viên, tên nhân viên.
+      File phải có dòng nhóm nhân viên ở cột A và Mã KCB ở cột B đối với dòng giao dịch chi tiết.
+    </p>
+
+    <form method="post" action="/cash-control/import" enctype="multipart/form-data">
+      <label>Import bảng tổng hợp thu tiền trên HIS</label>
+      <input type="file" name="revenue_file" accept=".xlsx" required>
+      <button class="primary cash-control-ui-font" type="submit" style="margin-top:12px;">Import và tính toán</button>
+    </form>
+  </div>
+
+  <div class="panel">
+    <h3>Các lần import dữ liệu HIS</h3>
+
+    <form method="get" action="/cash-control" class="grid3" style="margin-bottom:12px;">
+      <input type="hidden" name="main_tab" value="summary">
+      <input type="hidden" name="summary_tab" value="his">
+
+      <div>
+        <label>Năm</label>
+        <select name="his_import_year">
+          <option value="">Tất cả năm</option>
+          {% for y in his_import_years %}
+          <option value="{{ y }}" {% if selected_his_import_year == y %}selected{% endif %}>{{ y }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div>
+        <label>Tháng</label>
+        <select name="his_import_month">
+          <option value="">Tất cả tháng</option>
+          {% for m in his_import_months %}
+          <option value="{{ m }}" {% if selected_his_import_month == m %}selected{% endif %}>Tháng {{ m }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div>
+        <label>Ngày</label>
+        <select name="his_import_day">
+          <option value="">Tất cả ngày</option>
+          {% for d in his_import_days %}
+          <option value="{{ d }}" {% if selected_his_import_day == d %}selected{% endif %}>Ngày {{ d }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div style="grid-column:1/-1;">
+        <button class="primary cash-control-ui-font" type="submit">Lọc danh sách</button>
+        <a class="secondary-link cash-control-ui-font" href="/cash-control?main_tab=summary&summary_tab=his">Bỏ lọc</a>
+      </div>
+    </form>
+
+    <table class="table compact">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Tên file</th>
+          <th>Người import</th>
+          <th>Thời điểm</th>
+          <th>Thao tác</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for b in batches %}
+        <tr>
+          <td>{{ b.id }}</td>
+          <td>{{ b.original_filename }}</td>
+          <td>{{ b.creator_name }}</td>
+          <td>{{ format_vn_sqlite_datetime(b.created_at) }}</td>
+          <td>
+            <a href="/cash-control/{{ b.id }}?main_tab=summary&summary_tab=his">Xem thống kê</a>
+            <form method="post" action="/cash-control/import/{{ b.id }}/replace" enctype="multipart/form-data" style="margin-top:8px;">
+              <input type="file" name="revenue_file" accept=".xlsx" required>
+              <div class="muted" style="margin-top:6px;">
+                Chọn file Excel trước, sau đó bấm “Xác nhận Import lại” để thay dữ liệu HIS cũ.
+              </div>
+              <button class="secondary cash-control-ui-font cash-btn-confirm-import" type="submit" style="margin-top:8px;" onclick="return confirm('Bạn chắc chắn muốn import lại dữ liệu HIS? Dữ liệu cũ sẽ được thay bằng file mới.');">Xác nhận Import lại</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="empty">Chưa có dữ liệu import HIS.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if selected_batch %}
+  <div class="panel cash-collapsible-panel is-collapsed">
+    <h3>Thống kê doanh thu HIS theo mã nhân viên, tên nhân viên</h3>
+    <p><b>File:</b> {{ selected_batch.original_filename }}</p>
+
+    <table class="table compact">
+      <thead>
+        <tr>
+          <th>Mã NV</th>
+          <th>Tên nhân viên</th>
+          <th>Số bệnh nhân</th>
+          <th>Số dòng giao dịch</th>
+          <th>Tiền thu</th>
+          <th>Tạm ứng</th>
+          <th>Tiền chi</th>
+          <th>Miễn giảm</th>
+          <th>Hủy phiếu</th>
+          <th>Thực thu</th>
+          <th>Tiền mặt</th>
+          <th>Không bằng tiền mặt</th>
+          <th>Chuyển khoản</th>
+          <th>QR</th>
+          <th>POS</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in summaries %}
+        <tr>
+          <td>{{ r.employee_code }}</td>
+          <td>{{ r.employee_name }}</td>
+          <td class="num">{{ r.patient_count or 0 }}</td>
+          <td class="num">{{ r.txn_count }}</td>
+          <td class="num">{{ '{:,.0f}'.format(r.tien_thu or 0).replace(',', '.') }}</td>
+          <td class="num">{{ '{:,.0f}'.format(r.tam_ung or 0).replace(',', '.') }}</td>
+          <td class="num">{{ '{:,.0f}'.format(r.tien_chi or 0).replace(',', '.') }}</td>
+          <td class="num">{{ '{:,.0f}'.format(r.mien_giam or 0).replace(',', '.') }}</td>
+          <td class="num">{{ '{:,.0f}'.format(r.huy_phieu or 0).replace(',', '.') }}</td>
+          <td class="num">{{ '{:,.0f}'.format(r.thuc_thu or 0).replace(',', '.') }}</td>
+          <td class="num">{{ '{:,.0f}'.format(r.tien_mat or 0).replace(',', '.') }}</td>
+          <td class="num">{{ '{:,.0f}'.format(r.khong_bang_tien_mat or 0).replace(',', '.') }}</td>
+          <td class="num">{{ '{:,.0f}'.format(r.chuyen_khoan or 0).replace(',', '.') }}</td>
+          <td class="num">{{ '{:,.0f}'.format(r.qr or 0).replace(',', '.') }}</td>
+          <td class="num">{{ '{:,.0f}'.format(r.pos or 0).replace(',', '.') }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="15" class="empty">Không có dữ liệu thống kê.</td></tr>
+        {% endfor %}
+
+        {% if summaries %}
+        <tr class="total-row">
+          <td colspan="2"><b>Tổng cộng</b></td>
+          <td class="num"><b>{{ totals.get('patient_count', 0)|int }}</b></td>
+          <td class="num"><b>{{ totals.get('txn_count', 0)|int }}</b></td>
+          <td class="num"><b>{{ '{:,.0f}'.format(totals.get('tien_thu', 0) or 0).replace(',', '.') }}</b></td>
+          <td class="num"><b>{{ '{:,.0f}'.format(totals.get('tam_ung', 0) or 0).replace(',', '.') }}</b></td>
+          <td class="num"><b>{{ '{:,.0f}'.format(totals.get('tien_chi', 0) or 0).replace(',', '.') }}</b></td>
+          <td class="num"><b>{{ '{:,.0f}'.format(totals.get('mien_giam', 0) or 0).replace(',', '.') }}</b></td>
+          <td class="num"><b>{{ '{:,.0f}'.format(totals.get('huy_phieu', 0) or 0).replace(',', '.') }}</b></td>
+          <td class="num"><b>{{ '{:,.0f}'.format(totals.get('thuc_thu', 0) or 0).replace(',', '.') }}</b></td>
+          <td class="num"><b>{{ '{:,.0f}'.format(totals.get('tien_mat', 0) or 0).replace(',', '.') }}</b></td>
+          <td class="num"><b>{{ '{:,.0f}'.format(totals.get('khong_bang_tien_mat', 0) or 0).replace(',', '.') }}</b></td>
+          <td class="num"><b>{{ '{:,.0f}'.format(totals.get('chuyen_khoan', 0) or 0).replace(',', '.') }}</b></td>
+          <td class="num"><b>{{ '{:,.0f}'.format(totals.get('qr', 0) or 0).replace(',', '.') }}</b></td>
+          <td class="num"><b>{{ '{:,.0f}'.format(totals.get('pos', 0) or 0).replace(',', '.') }}</b></td>
+        </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  {% elif active_summary_tab == 'cashbook' %}
+  <div class="panel">
+    <h3>Tổng hợp Sổ quỹ tiền mặt</h3>
+    <p class="muted">
+      Import Sổ quỹ tiền mặt để tổng hợp các khoản thu theo Mã đối tượng Có và các khoản chi theo Mã đối tượng Nợ.
+    </p>
+
+    <form method="post" action="/cash-control/cashbook/import" enctype="multipart/form-data">
+      <label>Import Sổ quỹ tiền mặt</label>
+      <input type="file" name="cashbook_file" accept=".xlsx" required>
+      <button class="primary cash-control-ui-font" type="submit" style="margin-top:12px;">Import Sổ quỹ và tổng hợp</button>
+    </form>
+  </div>
+
+  <div class="panel">
+    <h3>Các lần import Sổ quỹ tiền mặt</h3>
+
+    <form method="get" action="/cash-control" class="grid3" style="margin-bottom:12px;">
+      <input type="hidden" name="main_tab" value="summary">
+      <input type="hidden" name="summary_tab" value="cashbook">
+
+      <div>
+        <label>Năm</label>
+        <select name="cashbook_import_year">
+          <option value="">Tất cả năm</option>
+          {% for y in cashbook_import_years %}
+          <option value="{{ y }}" {% if selected_cashbook_import_year == y %}selected{% endif %}>{{ y }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div>
+        <label>Tháng</label>
+        <select name="cashbook_import_month">
+          <option value="">Tất cả tháng</option>
+          {% for m in cashbook_import_months %}
+          <option value="{{ m }}" {% if selected_cashbook_import_month == m %}selected{% endif %}>Tháng {{ m }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div>
+        <label>Ngày</label>
+        <select name="cashbook_import_day">
+          <option value="">Tất cả ngày</option>
+          {% for d in cashbook_import_days %}
+          <option value="{{ d }}" {% if selected_cashbook_import_day == d %}selected{% endif %}>Ngày {{ d }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div style="grid-column:1/-1;">
+        <button class="primary cash-control-ui-font" type="submit">Lọc danh sách</button>
+        <a class="secondary-link cash-control-ui-font" href="/cash-control?main_tab=summary&summary_tab=cashbook">Bỏ lọc</a>
+      </div>
+    </form>
+
+    <table class="table compact">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Tên file</th>
+          <th>Người import</th>
+          <th>Thời điểm</th>
+          <th>Thao tác</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for b in cashbook_batches_filtered or cashbook_batches %}
+        <tr>
+          <td>{{ b.id }}</td>
+          <td>{{ b.original_filename }}</td>
+          <td>{{ b.creator_name }}</td>
+          <td>{{ format_vn_sqlite_datetime(b.created_at) }}</td>
+          <td>
+            <a href="/cash-control?main_tab=summary&summary_tab=cashbook&cashbook_batch_id={{ b.id }}">Xem thống kê</a>
+            <form method="post" action="/cash-control/cashbook/import/{{ b.id }}/replace" enctype="multipart/form-data" style="margin-top:8px;">
+              <input type="file" name="cashbook_file" accept=".xlsx" required>
+              <div class="muted" style="margin-top:6px;">
+                Chọn file Excel trước, sau đó bấm “Xác nhận Import lại” để thay dữ liệu Sổ quỹ cũ.
+              </div>
+              <button class="secondary cash-control-ui-font cash-btn-confirm-import" type="submit" style="margin-top:8px;" onclick="return confirm('Bạn chắc chắn muốn import lại Sổ quỹ tiền mặt? Dữ liệu cũ sẽ được thay bằng file mới.');">Xác nhận Import lại</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="empty">Chưa có dữ liệu Sổ quỹ tiền mặt.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if selected_cashbook_batch %}
+  <div class="panel cash-collapsible-panel is-collapsed">
+    <h3>Tổng hợp khoản thu từ Sổ quỹ tiền mặt</h3>
+    <p>
+      <b>File:</b> {{ selected_cashbook_batch.original_filename }}<br>
+      <b>Thu:</b> Gồm {{ cashbook_totals.get('receipt_count', 0)|int }} phiếu thu.
+    </p>
+
+    <table class="table compact">
+      <thead>
+        <tr>
+          <th>STT</th>
+          <th>Khoản thu</th>
+          <th>Số phiếu thu</th>
+          <th>Số tiền</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in cashbook_receipts %}
+        <tr>
+          <td class="num">{{ loop.index }}</td>
+          <td>{{ r.item_name }}</td>
+          <td class="num">{{ r.voucher_count }}</td>
+          <td class="num">{{ '{:,.0f}'.format(r.amount or 0).replace(',', '.') }}</td>
+        </tr>
+        {% endfor %}
+        <tr class="total-row">
+          <td colspan="2"><b>Tổng cộng</b></td>
+          <td class="num"><b>{{ cashbook_totals.get('receipt_count', 0)|int }}</b></td>
+          <td class="num"><b>{{ '{:,.0f}'.format(cashbook_totals.get('receipt_total', 0) or 0).replace(',', '.') }}</b></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="panel cash-collapsible-panel is-collapsed">
+    <h3>Tổng hợp khoản chi từ Sổ quỹ tiền mặt</h3>
+    <p>
+      <b>Chi:</b> Gồm {{ cashbook_totals.get('expense_count', 0)|int }} phiếu chi,
+      trong đó {{ cashbook_totals.get('refund_kcb_count', 0)|int }} phiếu chi hoàn tiền KCB.
+    </p>
+
+    <table class="table compact">
+      <thead>
+        <tr>
+          <th>STT</th>
+          <th>Khoản chi</th>
+          <th>Số phiếu chi</th>
+          <th>Số tiền</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in cashbook_expenses %}
+        <tr>
+          <td class="num">{{ loop.index }}</td>
+          <td>{{ r.item_name }}</td>
+          <td class="num">{{ r.voucher_count }}</td>
+          <td class="num">{{ '{:,.0f}'.format(r.amount or 0).replace(',', '.') }}</td>
+        </tr>
+        {% endfor %}
+        <tr class="total-row">
+          <td colspan="2"><b>Tổng cộng</b></td>
+          <td class="num"><b>{{ cashbook_totals.get('expense_count', 0)|int }}</b></td>
+          <td class="num"><b>{{ '{:,.0f}'.format(cashbook_totals.get('expense_total', 0) or 0).replace(',', '.') }}</b></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  {% elif active_summary_tab == 'accounting' %}
+  <div class="panel">
+    <h3>Tổng hợp số báo cáo của Kế toán</h3>
+    <p class="muted">
+      Import Bảng kê/Báo cáo của Kế toán để làm nguồn đối chiếu thứ ba với HIS và Sổ quỹ tiền mặt.
+    </p>
+
+    <form method="post" action="/cash-control/accounting/import" enctype="multipart/form-data">
+      <label>Import Bảng kê/Báo cáo của Kế toán</label>
+      <input type="file" name="accounting_file" accept=".xlsx" required>
+      <button class="primary cash-control-ui-font" type="submit" style="margin-top:12px;">Import báo cáo Kế toán</button>
+    </form>
+  </div>
+
+  <div class="panel">
+    <h3>Các lần import báo cáo Kế toán</h3>
+
+    <form method="get" action="/cash-control" class="grid3" style="margin-bottom:12px;">
+      <input type="hidden" name="main_tab" value="summary">
+      <input type="hidden" name="summary_tab" value="accounting">
+
+      <div>
+        <label>Năm</label>
+        <select name="accounting_import_year">
+          <option value="">Tất cả năm</option>
+          {% for y in accounting_import_years %}
+          <option value="{{ y }}" {% if selected_accounting_import_year == y %}selected{% endif %}>{{ y }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div>
+        <label>Tháng</label>
+        <select name="accounting_import_month">
+          <option value="">Tất cả tháng</option>
+          {% for m in accounting_import_months %}
+          <option value="{{ m }}" {% if selected_accounting_import_month == m %}selected{% endif %}>Tháng {{ m }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div>
+        <label>Ngày</label>
+        <select name="accounting_import_day">
+          <option value="">Tất cả ngày</option>
+          {% for d in accounting_import_days %}
+          <option value="{{ d }}" {% if selected_accounting_import_day == d %}selected{% endif %}>Ngày {{ d }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div style="grid-column:1/-1;">
+        <button class="primary cash-control-ui-font" type="submit">Lọc danh sách</button>
+        <a class="secondary-link cash-control-ui-font" href="/cash-control?main_tab=summary&summary_tab=accounting">Bỏ lọc</a>
+      </div>
+    </form>
+
+    <table class="table compact">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Tên file</th>
+          <th>Người import</th>
+          <th>Thời điểm</th>
+          <th>Thao tác</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for b in accounting_batches_filtered or accounting_batches %}
+        <tr>
+          <td>{{ b.id }}</td>
+          <td>{{ b.original_filename }}</td>
+          <td>{{ b.creator_name }}</td>
+          <td>{{ format_vn_sqlite_datetime(b.created_at) }}</td>
+          <td>
+            <a href="/cash-control?main_tab=summary&summary_tab=accounting&accounting_batch_id={{ b.id }}">Xem thống kê</a>
+            <form method="post" action="/cash-control/accounting/import/{{ b.id }}/replace" enctype="multipart/form-data" style="margin-top:8px;">
+              <input type="file" name="accounting_file" accept=".xlsx" required>
+              <div class="muted" style="margin-top:6px;">
+                Chọn file Excel trước, sau đó bấm “Xác nhận Import lại” để thay dữ liệu Kế toán cũ.
+              </div>
+              <button class="secondary cash-control-ui-font cash-btn-confirm-import" type="submit" style="margin-top:8px;" onclick="return confirm('Bạn chắc chắn muốn import lại báo cáo Kế toán? Dữ liệu cũ sẽ được thay bằng file mới.');">Xác nhận Import lại</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="empty">Chưa có dữ liệu báo cáo Kế toán.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if selected_accounting_batch %}
+  <div class="panel cash-collapsible-panel is-collapsed">
+    <h3>Tổng hợp khoản thu theo báo cáo Kế toán</h3>
+    <p><b>File:</b> {{ selected_accounting_batch.original_filename }}</p>
+
+    <table class="table compact">
+      <thead>
+        <tr>
+          <th>STT</th>
+          <th>Khoản mục</th>
+          <th>Số tiền</th>
+          <th>Ghi chú nguồn</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in accounting_summaries %}
+        <tr>
+          <td class="num">{{ loop.index }}</td>
+          <td>{{ r.item_name }}</td>
+          <td class="num">{{ '{:,.0f}'.format(r.amount or 0).replace(',', '.') }}</td>
+          <td>{{ r.note or '' }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4" class="empty">Chưa có dữ liệu tổng hợp kế toán.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="panel cash-collapsible-panel is-collapsed">
+    <h3>Tổng hợp khoản thu khám chữa bệnh không dùng tiền mặt</h3>
+    <p class="muted">
+      Không dùng tiền mặt = Chuyển khoản theo ML + QR động + Máy POS trên file Bảng kê/Báo cáo Kế toán.
+      Báo cáo tổng của Kế toán = cột “Chuyển khoản + QR động + Máy POS” trên file Excel.
+      Chênh lệch = Không dùng tiền mặt - Báo cáo tổng của Kế toán.
+    </p>
+    <table class="table compact">
+      <thead>
+        <tr>
+          <th>Khoản mục</th>
+          <th>Chuyển khoản theo ML</th>
+          <th>QR động</th>
+          <th>Máy POS</th>
+          <th>Không dùng tiền mặt</th>
+          <th>Báo cáo tổng của Kế toán</th>
+          <th>Chênh lệch</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="total-row">
+          <td><b>Thu tiền khám chữa bệnh không dùng tiền mặt</b></td>
+          <td class="num"><b>{{ '{:,.0f}'.format(accounting_employee_totals.get('accounting_bank_ml_amount', 0) or 0).replace(',', '.') }}</b></td>
+          <td class="num"><b>{{ '{:,.0f}'.format(accounting_employee_totals.get('accounting_qr_amount', 0) or 0).replace(',', '.') }}</b></td>
+          <td class="num"><b>{{ '{:,.0f}'.format(accounting_employee_totals.get('accounting_pos_amount', 0) or 0).replace(',', '.') }}</b></td>
+          <td class="num"><b>{{ '{:,.0f}'.format(accounting_employee_totals.get('accounting_non_cash_amount', 0) or 0).replace(',', '.') }}</b></td>
+          <td class="num"><b>{{ '{:,.0f}'.format(accounting_employee_totals.get('accounting_report_non_cash_amount', 0) or 0).replace(',', '.') }}</b></td>
+          <td class="num {% if accounting_employee_totals.get('accounting_non_cash_diff_amount', 0) %}warning-cell{% endif %}">
+            <b>{{ '{:,.0f}'.format(accounting_employee_totals.get('accounting_non_cash_diff_amount', 0) or 0).replace(',', '.') }}</b>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="panel cash-collapsible-panel is-collapsed">
+    <h3>Đối chiếu tiền mặt khám chữa bệnh theo nhân viên</h3>
+    <table class="table compact">
+      <thead>
+        <tr>
+          <th>Mã NV</th>
+          <th>Tên nhân viên</th>
+          <th>Tiền mặt theo Kế toán</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in accounting_employee_summaries %}
+        <tr>
+          <td>{{ r.employee_code }}</td>
+          <td>{{ r.employee_name }}</td>
+          <td class="num">{{ '{:,.0f}'.format(r.accounting_cash_amount or 0).replace(',', '.') }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="3" class="empty">Chưa có dữ liệu nhân viên từ báo cáo Kế toán.</td></tr>
+        {% endfor %}
+        {% if accounting_employee_summaries %}
+        <tr class="total-row">
+          <td colspan="2"><b>Tổng cộng</b></td>
+          <td class="num"><b>{{ '{:,.0f}'.format(accounting_employee_totals.get('accounting_cash_amount', 0) or 0).replace(',', '.') }}</b></td>
+        </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+
+<div class="panel cash-collapsible-panel is-collapsed">
+  <h3>4. Đối chiếu không dùng tiền mặt theo nhân viên</h3>
+  <p class="muted">
+    Chỉ hiển thị nhân viên có chênh lệch giữa không dùng tiền mặt trên HIS, số không dùng tiền mặt Kế toán tự cộng 3 cột và cột Báo cáo tổng của Kế toán.
+  </p>
+  <table class="table compact">
+    <thead>
+      <tr>
+        <th>Mã NV</th>
+        <th>Tên nhân viên</th>
+        <th>Không dùng tiền mặt HIS</th>
+        <th>Không dùng tiền mặt Kế toán</th>
+        <th>Báo cáo tổng của Kế toán</th>
+        <th>Chênh lệch HIS/Không dùng tiền mặt Kế toán</th>
+        <th>Chênh lệch HIS/Báo cáo tổng của Kế toán</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in employee_non_cash_reconcile_rows %}
+      <tr>
+        <td>{{ r.employee_code }}</td>
+        <td>{{ r.employee_name }}</td>
+        <td class="num">{{ '{:,.0f}'.format(r.his_non_cash_amount or 0).replace(',', '.') }}</td>
+        <td class="num">{{ '{:,.0f}'.format(r.accounting_non_cash_amount or 0).replace(',', '.') }}</td>
+        <td class="num">{{ '{:,.0f}'.format(r.accounting_report_non_cash_amount or 0).replace(',', '.') }}</td>
+        <td class="num {% if r.diff_his_accounting_non_cash_amount %}warning-cell{% endif %}">
+          {{ '{:,.0f}'.format(r.diff_his_accounting_non_cash_amount or 0).replace(',', '.') }}
+        </td>
+        <td class="num {% if r.diff_his_accounting_report_non_cash_amount %}warning-cell{% endif %}">
+          {{ '{:,.0f}'.format(r.diff_his_accounting_report_non_cash_amount or 0).replace(',', '.') }}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" class="empty">Chưa có chênh lệch không dùng tiền mặt theo nhân viên hoặc chưa đủ dữ liệu HIS/Kế toán.</td></tr>
+      {% endfor %}
+      {% if employee_non_cash_reconcile_rows %}
+      <tr class="total-row">
+        <td colspan="2"><b>Tổng cộng</b></td>
+        <td class="num"><b>{{ '{:,.0f}'.format(employee_non_cash_reconcile_rows | sum(attribute='his_non_cash_amount')).replace(',', '.') }}</b></td>
+        <td class="num"><b>{{ '{:,.0f}'.format(employee_non_cash_reconcile_rows | sum(attribute='accounting_non_cash_amount')).replace(',', '.') }}</b></td>
+        <td class="num"><b>{{ '{:,.0f}'.format(employee_non_cash_reconcile_rows | sum(attribute='accounting_report_non_cash_amount')).replace(',', '.') }}</b></td>
+        <td class="num warning-cell"><b>{{ '{:,.0f}'.format(employee_non_cash_reconcile_rows | sum(attribute='diff_his_accounting_non_cash_amount')).replace(',', '.') }}</b></td>
+        <td class="num warning-cell"><b>{{ '{:,.0f}'.format(employee_non_cash_reconcile_rows | sum(attribute='diff_his_accounting_report_non_cash_amount')).replace(',', '.') }}</b></td>
+      </tr>
+      {% endif %}
+    </tbody>
+  </table>
+</div>
+  {% endif %}
+  {% endif %}
+
+{% elif active_main_tab == 'reconcile' %}
+<div class="panel">
+  <h3>Đối chiếu số liệu</h3>
+  <p class="muted">
+    Đối chiếu ma trận giữa 03 nguồn: Doanh thu trên HIS, Sổ quỹ tiền mặt và Báo cáo/Bảng kê của Kế toán.
+    Riêng dòng Thu tiền khám chữa bệnh: khi đối chiếu sẽ cộng Thu tiền mặt trên HIS với Thu tiền Quầy kính từ Sổ quỹ tiền mặt.
+  </p>
+
+  <form method="get" action="/cash-control" class="grid3">
+    <input type="hidden" name="main_tab" value="reconcile">
+
+    <div>
+      <label>Chọn dữ liệu doanh thu HIS</label>
+      <select name="his_batch_id">
+        {% for b in batches %}
+        <option value="{{ b.id }}" {% if selected_his_batch_id == b.id %}selected{% endif %}>
+          #{{ b.id }} - {{ b.original_filename }} - {{ format_vn_sqlite_datetime(b.created_at) }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div>
+      <label>Chọn dữ liệu Sổ quỹ tiền mặt</label>
+      <select name="cashbook_batch_id">
+        {% for b in cashbook_batches %}
+        <option value="{{ b.id }}" {% if selected_cashbook_batch_id == b.id %}selected{% endif %}>
+          #{{ b.id }} - {{ b.original_filename }} - {{ format_vn_sqlite_datetime(b.created_at) }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div>
+      <label>Chọn dữ liệu Báo cáo Kế toán</label>
+      <select name="accounting_batch_id">
+        {% for b in accounting_batches %}
+        <option value="{{ b.id }}" {% if selected_accounting_batch_id == b.id %}selected{% endif %}>
+          #{{ b.id }} - {{ b.original_filename }} - {{ format_vn_sqlite_datetime(b.created_at) }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div style="grid-column:1/-1;">
+      <button class="primary cash-control-ui-font" type="submit">Đối chiếu bộ dữ liệu đã chọn</button>
+    </div>
+  </form>
+</div>
+
+<div class="panel cash-collapsible-panel is-collapsed">
+  <h3>1. Ma trận đối chiếu khoản thu</h3>
+  <p class="muted">
+    HIS:
+    {% if selected_batch %}#{{ selected_batch.id }} - {{ selected_batch.original_filename }}{% else %}chưa chọn{% endif %};
+    Sổ quỹ:
+    {% if selected_cashbook_batch %}#{{ selected_cashbook_batch.id }} - {{ selected_cashbook_batch.original_filename }}{% else %}chưa chọn{% endif %};
+    Kế toán:
+    {% if selected_accounting_batch %}#{{ selected_accounting_batch.id }} - {{ selected_accounting_batch.original_filename }}{% else %}chưa chọn{% endif %}.
+  </p>
+  <table class="table compact">
+    <thead>
+      <tr>
+        <th>Khoản thu</th>
+        <th>HIS tiền mặt</th>
+        <th>Sổ quỹ tiền mặt</th>
+        <th>Báo cáo Kế toán</th>
+        <th>Chênh lệch KSNB - Sổ quỹ</th>
+        <th>(Chênh lệch KSNB - Sổ quỹ) - Chênh lệch báo cáo kế toán</th>
+        <th>Chênh lệch KSNB - Kế toán</th>
+        <th>Chênh lệch Sổ quỹ - Kế toán</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in reconcile_revenue_matrix %}
+      <tr>
+        <td>{{ r.item_name }}</td>
+        <td class="num">{{ '{:,.0f}'.format(r.his_amount or 0).replace(',', '.') }}</td>
+        <td class="num">{{ '{:,.0f}'.format(r.cashbook_amount or 0).replace(',', '.') }}</td>
+        <td class="num">{{ '{:,.0f}'.format(r.accounting_amount or 0).replace(',', '.') }}</td>
+        <td class="num {% if r.diff_his_cashbook %}warning-cell{% endif %}">{{ '{:,.0f}'.format(r.diff_his_cashbook or 0).replace(',', '.') }}</td>
+        <td class="num {% if r.diff_ksnb_cashbook_minus_accounting_report_diff %}warning-cell{% endif %}">{{ '{:,.0f}'.format(r.diff_ksnb_cashbook_minus_accounting_report_diff or 0).replace(',', '.') }}</td>
+        <td class="num {% if r.diff_his_accounting %}warning-cell{% endif %}">{{ '{:,.0f}'.format(r.diff_his_accounting or 0).replace(',', '.') }}</td>
+        <td class="num {% if r.diff_cashbook_accounting %}warning-cell{% endif %}">{{ '{:,.0f}'.format(r.diff_cashbook_accounting or 0).replace(',', '.') }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="panel cash-collapsible-panel is-collapsed">
+  <h3>1.1. Khoản thu khám chữa bệnh không có trong tổng hợp HIS</h3>
+  <p class="muted">
+    Chỉ ghi nhận khi đã có dữ liệu tổng hợp HIS, đã có dữ liệu Sổ quỹ hoặc Báo cáo Kế toán,
+    khoản thu tiền mặt KCB phát sinh ở Sổ quỹ/Kế toán nhưng không có số liệu tương ứng hoặc bằng 0
+    trong tổng hợp HIS.
+  </p>
+  <table class="table compact">
+    <thead>
+      <tr>
+        <th>STT</th>
+        <th>Nội dung</th>
+        <th>Số tiền Sổ quỹ</th>
+        <th>Số tiền Báo cáo Kế toán</th>
+        <th>Số tiền trên HIS</th>
+        <th>Chênh lệch cần rà soát</th>
+        <th>Ghi chú kiểm soát</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in kcb_not_in_his_rows %}
+      <tr>
+        <td class="num">{{ loop.index }}</td>
+        <td>{{ r.content }}</td>
+        <td class="num">{{ '{:,.0f}'.format(r.cashbook_amount or 0).replace(',', '.') }}</td>
+        <td class="num">{{ '{:,.0f}'.format(r.accounting_amount or 0).replace(',', '.') }}</td>
+        <td class="num">{{ '{:,.0f}'.format(r.his_amount or 0).replace(',', '.') }}</td>
+        <td class="num {% if r.diff_amount %}warning-cell{% endif %}">{{ '{:,.0f}'.format(r.diff_amount or 0).replace(',', '.') }}</td>
+        <td class="{% if r.diff_amount %}warning-cell{% endif %}">{{ r.note }}</td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="7" class="empty">
+          Không phát hiện khoản thu tiền mặt KCB có trên Sổ quỹ/Kế toán nhưng không có trong tổng hợp HIS.
+        </td>
+      </tr>
+      {% endfor %}
+
+      {% if kcb_not_in_his_rows %}
+      <tr class="total-row">
+        <td colspan="2"><b>Tổng cộng</b></td>
+        <td class="num"><b>{{ '{:,.0f}'.format(kcb_not_in_his_rows | sum(attribute='cashbook_amount')).replace(',', '.') }}</b></td>
+        <td class="num"><b>{{ '{:,.0f}'.format(kcb_not_in_his_rows | sum(attribute='accounting_amount')).replace(',', '.') }}</b></td>
+        <td class="num"><b>{{ '{:,.0f}'.format(kcb_not_in_his_rows | sum(attribute='his_amount')).replace(',', '.') }}</b></td>
+        <td class="num warning-cell"><b>{{ '{:,.0f}'.format(kcb_not_in_his_rows | sum(attribute='diff_amount')).replace(',', '.') }}</b></td>
+        <td><b>Tổng cộng các khoản thu tiền mặt KCB có trong Sổ quỹ/Kế toán nhưng không có trong tổng hợp HIS.</b></td>
+      </tr>
+      {% endif %}
+    </tbody>
+  </table>
+</div>
+
+<div class="panel cash-collapsible-panel is-collapsed">
+  <h3>2. Ma trận đối chiếu khoản chi</h3>
+  <table class="table compact">
+    <thead>
+      <tr>
+        <th>Khoản chi</th>
+        <th>Sổ quỹ tiền mặt</th>
+        <th>Báo cáo Kế toán</th>
+        <th>Chênh lệch</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in reconcile_expense_matrix %}
+      <tr>
+        <td>{{ r.item_name }}</td>
+        <td class="num">{{ '{:,.0f}'.format(r.cashbook_amount or 0).replace(',', '.') }}</td>
+        <td class="num">{{ '{:,.0f}'.format(r.accounting_amount or 0).replace(',', '.') }}</td>
+        <td class="num {% if r.diff_amount %}warning-cell{% endif %}">{{ '{:,.0f}'.format(r.diff_amount or 0).replace(',', '.') }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="panel cash-collapsible-panel is-collapsed">
+  <h3>3. Đối chiếu tiền mặt khám chữa bệnh theo nhân viên</h3>
+  <p class="muted">
+    Chỉ hiển thị nhân viên có chênh lệch giữa tiền mặt theo HIS và tiền mặt theo Bảng kê Kế toán.
+  </p>
+  <table class="table compact">
+    <thead>
+      <tr>
+        <th>Mã NV</th>
+        <th>Tên nhân viên</th>
+        <th>Tiền mặt HIS</th>
+        <th>Tiền mặt Kế toán</th>
+        <th>Chênh lệch</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in employee_reconcile_rows %}
+      <tr>
+        <td>{{ r.employee_code }}</td>
+        <td>{{ r.employee_name }}</td>
+        <td class="num">{{ '{:,.0f}'.format(r.his_cash_amount or 0).replace(',', '.') }}</td>
+        <td class="num">{{ '{:,.0f}'.format(r.accounting_cash_amount or 0).replace(',', '.') }}</td>
+        <td class="num warning-cell">{{ '{:,.0f}'.format(r.diff_amount or 0).replace(',', '.') }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="empty">Chưa có chênh lệch theo nhân viên hoặc chưa đủ dữ liệu HIS/Kế toán.</td></tr>
+      {% endfor %}
+      {% if employee_reconcile_rows %}
+      <tr class="total-row">
+        <td colspan="2"><b>Tổng cộng</b></td>
+        <td class="num"><b>{{ '{:,.0f}'.format(employee_reconcile_rows | sum(attribute='his_cash_amount')).replace(',', '.') }}</b></td>
+        <td class="num"><b>{{ '{:,.0f}'.format(employee_reconcile_rows | sum(attribute='accounting_cash_amount')).replace(',', '.') }}</b></td>
+        <td class="num warning-cell"><b>{{ '{:,.0f}'.format(employee_reconcile_rows | sum(attribute='diff_amount')).replace(',', '.') }}</b></td>
+      </tr>
+      {% endif %}
+    </tbody>
+  </table>
+</div>
+
+<div class="panel cash-collapsible-panel is-collapsed">
+  <h3>4. Đối chiếu không dùng tiền mặt theo nhân viên</h3>
+  <p class="muted">
+    Chỉ hiển thị nhân viên có chênh lệch giữa không dùng tiền mặt trên HIS, số không dùng tiền mặt Kế toán tự cộng 3 cột và cột Báo cáo tổng của Kế toán.
+  </p>
+  <table class="table compact">
+    <thead>
+      <tr>
+        <th>Mã NV</th>
+        <th>Tên nhân viên</th>
+        <th>Không dùng tiền mặt HIS</th>
+        <th>Không dùng tiền mặt Kế toán</th>
+        <th>Báo cáo tổng của Kế toán</th>
+        <th>Chênh lệch HIS/Không dùng tiền mặt Kế toán</th>
+        <th>Chênh lệch HIS/Báo cáo tổng của Kế toán</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in employee_non_cash_reconcile_rows %}
+      <tr>
+        <td>{{ r.employee_code }}</td>
+        <td>{{ r.employee_name }}</td>
+        <td class="num">{{ '{:,.0f}'.format(r.his_non_cash_amount or 0).replace(',', '.') }}</td>
+        <td class="num">{{ '{:,.0f}'.format(r.accounting_non_cash_amount or 0).replace(',', '.') }}</td>
+        <td class="num">{{ '{:,.0f}'.format(r.accounting_report_non_cash_amount or 0).replace(',', '.') }}</td>
+        <td class="num {% if r.diff_his_accounting_non_cash_amount %}warning-cell{% endif %}">
+          {{ '{:,.0f}'.format(r.diff_his_accounting_non_cash_amount or 0).replace(',', '.') }}
+        </td>
+        <td class="num {% if r.diff_his_accounting_report_non_cash_amount %}warning-cell{% endif %}">
+          {{ '{:,.0f}'.format(r.diff_his_accounting_report_non_cash_amount or 0).replace(',', '.') }}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" class="empty">Chưa có chênh lệch không dùng tiền mặt theo nhân viên hoặc chưa đủ dữ liệu HIS/Kế toán.</td></tr>
+      {% endfor %}
+      {% if employee_non_cash_reconcile_rows %}
+      <tr class="total-row">
+        <td colspan="2"><b>Tổng cộng</b></td>
+        <td class="num"><b>{{ '{:,.0f}'.format(employee_non_cash_reconcile_rows | sum(attribute='his_non_cash_amount')).replace(',', '.') }}</b></td>
+        <td class="num"><b>{{ '{:,.0f}'.format(employee_non_cash_reconcile_rows | sum(attribute='accounting_non_cash_amount')).replace(',', '.') }}</b></td>
+        <td class="num"><b>{{ '{:,.0f}'.format(employee_non_cash_reconcile_rows | sum(attribute='accounting_report_non_cash_amount')).replace(',', '.') }}</b></td>
+        <td class="num warning-cell"><b>{{ '{:,.0f}'.format(employee_non_cash_reconcile_rows | sum(attribute='diff_his_accounting_non_cash_amount')).replace(',', '.') }}</b></td>
+        <td class="num warning-cell"><b>{{ '{:,.0f}'.format(employee_non_cash_reconcile_rows | sum(attribute='diff_his_accounting_report_non_cash_amount')).replace(',', '.') }}</b></td>
+      </tr>
+      {% endif %}
+    </tbody>
+  </table>
+</div>
+
+<div class="panel cash-collapsible-panel is-collapsed">
+  <h3>5. Phiếu thu cần rà soát khi có chênh lệch</h3>
+  <p class="muted">
+    Danh sách dưới đây lấy từ Mục 3. Chọn tên nhân viên có chênh lệch để xem các mã khám bệnh, tên bệnh nhân và số tiền mặt trên HIS thuộc nhân viên đó.
+  </p>
+
+  <table class="table compact">
+    <thead>
+      <tr>
+        <th>Mã NV</th>
+        <th>Tên nhân viên</th>
+        <th>Tiền mặt HIS</th>
+        <th>Tiền mặt Kế toán</th>
+        <th>Chênh lệch</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in receipt_difference_employees %}
+      <tr>
+        <td>{{ r.employee_code }}</td>
+        <td>
+          <button type="button" class="link-button js-his-employee-detail" data-employee-code="{{ r.employee_code }}">
+            {{ r.employee_name }}
+          </button>
+        </td>
+        <td class="num">{{ '{:,.0f}'.format(r.his_cash_amount or 0).replace(',', '.') }}</td>
+        <td class="num">{{ '{:,.0f}'.format(r.accounting_cash_amount or 0).replace(',', '.') }}</td>
+        <td class="num warning-cell">{{ '{:,.0f}'.format(r.diff_amount or 0).replace(',', '.') }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="empty">Chưa có nhân viên chênh lệch giữa HIS và Báo cáo Kế toán.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div style="margin-top:14px;">
+    <h4>Chi tiết mã khám bệnh/bệnh nhân theo nhân viên được chọn</h4>
+    <table class="table compact">
+      <thead>
+        <tr>
+          <th>Mã NV</th>
+          <th>Tên nhân viên</th>
+          <th>Mã khám bệnh</th>
+          <th>Tên bệnh nhân</th>
+          <th>Thực thu</th>
+          <th>Hủy phiếu</th>
+          <th>Tiền mặt HIS</th>
+          <th>Không bằng tiền mặt</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for d in receipt_difference_details %}
+        <tr class="his-detail-row"
+            data-employee-code="{{ d.employee_code }}"
+            data-thuc-thu="{{ d.thuc_thu or 0 }}"
+            data-huy-phieu="{{ d.huy_phieu or 0 }}"
+            data-tien-mat="{{ d.tien_mat or 0 }}"
+            data-khong-bang-tien-mat="{{ (d.chuyen_khoan or 0) + (d.qr or 0) + (d.pos or 0) }}"
+            style="display:none;">
+          <td>{{ d.employee_code }}</td>
+          <td>{{ d.employee_name }}</td>
+          <td>{{ d.patient_code }}</td>
+          <td>{{ d.patient_name }}</td>
+          <td class="num">{{ '{:,.0f}'.format(d.thuc_thu or 0).replace(',', '.') }}</td>
+          <td class="num">{{ '{:,.0f}'.format(d.huy_phieu or 0).replace(',', '.') }}</td>
+          <td class="num">{{ '{:,.0f}'.format(d.tien_mat or 0).replace(',', '.') }}</td>
+          <td class="num">{{ '{:,.0f}'.format((d.chuyen_khoan or 0) + (d.qr or 0) + (d.pos or 0)).replace(',', '.') }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="8" class="empty">Chưa có dữ liệu chi tiết HIS. Nếu đây là dữ liệu import cũ, cần import lại file HIS sau khi áp patch.</td></tr>
+        {% endfor %}
+        <tr id="his-detail-total-row" class="total-row" style="display:none;">
+          <td colspan="4"><b>Tổng cộng</b></td>
+          <td class="num"><b data-total-field="thucThu">0</b></td>
+          <td class="num"><b data-total-field="huyPhieu">0</b></td>
+          <td class="num"><b data-total-field="tienMat">0</b></td>
+          <td class="num"><b data-total-field="khongBangTienMat">0</b></td>
+        </tr>
+        <tr id="his-detail-empty-selected" style="display:none;">
+          <td colspan="8" class="empty">Không tìm thấy chi tiết HIS của nhân viên đang chọn trong lần import hiện tại.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+<div class="panel cash-collapsible-panel is-collapsed">
+  <h3>6. Chi tiết không dùng tiền mặt cần rà soát khi có chênh lệch</h3>
+  <p class="muted">
+    Danh sách dưới đây lấy từ Mục 4. Chọn tên nhân viên có chênh lệch để xem các mã khám bệnh, tên bệnh nhân và các khoản thu không dùng tiền mặt trên HIS thuộc nhân viên đó.
+  </p>
+
+  <table class="table compact">
+    <thead>
+      <tr>
+        <th>Mã NV</th>
+        <th>Tên nhân viên</th>
+        <th>Không dùng tiền mặt HIS</th>
+        <th>Không dùng tiền mặt Kế toán</th>
+        <th>Báo cáo tổng của Kế toán</th>
+        <th>Chênh lệch HIS/Không dùng tiền mặt Kế toán</th>
+        <th>Chênh lệch HIS/Báo cáo tổng của Kế toán</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in non_cash_difference_employees %}
+      <tr>
+        <td>{{ r.employee_code }}</td>
+        <td>
+          <button type="button" class="link-button js-non-cash-employee-detail" data-employee-code="{{ r.employee_code }}">
+            {{ r.employee_name }}
+          </button>
+        </td>
+        <td class="num">{{ '{:,.0f}'.format(r.his_non_cash_amount or 0).replace(',', '.') }}</td>
+        <td class="num">{{ '{:,.0f}'.format(r.accounting_non_cash_amount or 0).replace(',', '.') }}</td>
+        <td class="num">{{ '{:,.0f}'.format(r.accounting_report_non_cash_amount or 0).replace(',', '.') }}</td>
+        <td class="num {% if r.diff_his_accounting_non_cash_amount %}warning-cell{% endif %}">
+          {{ '{:,.0f}'.format(r.diff_his_accounting_non_cash_amount or 0).replace(',', '.') }}
+        </td>
+        <td class="num {% if r.diff_his_accounting_report_non_cash_amount %}warning-cell{% endif %}">
+          {{ '{:,.0f}'.format(r.diff_his_accounting_report_non_cash_amount or 0).replace(',', '.') }}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" class="empty">Chưa có nhân viên chênh lệch không dùng tiền mặt giữa HIS và Báo cáo Kế toán.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div style="margin-top:14px;">
+    <h4>Chi tiết mã khám bệnh/bệnh nhân không dùng tiền mặt theo nhân viên được chọn</h4>
+    <table class="table compact">
+      <thead>
+        <tr>
+          <th>Mã NV</th>
+          <th>Tên nhân viên</th>
+          <th>Mã khám bệnh</th>
+          <th>Tên bệnh nhân</th>
+          <th>Thực thu</th>
+          <th>Hủy phiếu</th>
+          <th>Chuyển khoản</th>
+          <th>QR</th>
+          <th>POS</th>
+          <th>Không dùng tiền mặt</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for d in non_cash_difference_details %}
+        <tr class="non-cash-detail-row"
+            data-employee-code="{{ d.employee_code }}"
+            data-thuc-thu="{{ d.thuc_thu or 0 }}"
+            data-huy-phieu="{{ d.huy_phieu or 0 }}"
+            data-chuyen-khoan="{{ d.chuyen_khoan or 0 }}"
+            data-qr="{{ d.qr or 0 }}"
+            data-pos="{{ d.pos or 0 }}"
+            data-khong-bang-tien-mat="{{ d.khong_bang_tien_mat or 0 }}"
+            style="display:none;">
+          <td>{{ d.employee_code }}</td>
+          <td>{{ d.employee_name }}</td>
+          <td>{{ d.patient_code }}</td>
+          <td>{{ d.patient_name }}</td>
+          <td class="num">{{ '{:,.0f}'.format(d.thuc_thu or 0).replace(',', '.') }}</td>
+          <td class="num">{{ '{:,.0f}'.format(d.huy_phieu or 0).replace(',', '.') }}</td>
+          <td class="num">{{ '{:,.0f}'.format(d.chuyen_khoan or 0).replace(',', '.') }}</td>
+          <td class="num">{{ '{:,.0f}'.format(d.qr or 0).replace(',', '.') }}</td>
+          <td class="num">{{ '{:,.0f}'.format(d.pos or 0).replace(',', '.') }}</td>
+          <td class="num">{{ '{:,.0f}'.format(d.khong_bang_tien_mat or 0).replace(',', '.') }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="10" class="empty">Chưa có dữ liệu chi tiết không dùng tiền mặt. Nếu đây là dữ liệu import cũ, cần import lại file HIS sau khi áp patch.</td></tr>
+        {% endfor %}
+        <tr id="non-cash-detail-total-row" class="total-row" style="display:none;">
+          <td colspan="4"><b>Tổng cộng</b></td>
+          <td class="num"><b data-total-field="thucThu">0</b></td>
+          <td class="num"><b data-total-field="huyPhieu">0</b></td>
+          <td class="num"><b data-total-field="chuyenKhoan">0</b></td>
+          <td class="num"><b data-total-field="qr">0</b></td>
+          <td class="num"><b data-total-field="pos">0</b></td>
+          <td class="num"><b data-total-field="khongBangTienMat">0</b></td>
+        </tr>
+        <tr id="non-cash-detail-empty-selected" style="display:none;">
+          <td colspan="10" class="empty">Không tìm thấy chi tiết không dùng tiền mặt của nhân viên đang chọn trong lần import hiện tại.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      function normalizeEmployeeCode(value) {
+        return String(value || "").trim();
+      }
+
+      function bindEmployeeDetailViewer(config) {
+        const buttons = document.querySelectorAll(config.buttonSelector);
+        const rows = document.querySelectorAll(config.rowSelector);
+        const emptyNotice = document.getElementById(config.emptyNoticeId);
+        const totalRow = config.totalRowId ? document.getElementById(config.totalRowId) : null;
+
+        function moneyNumber(value) {
+          const parsed = Number(value || 0);
+          return Number.isFinite(parsed) ? parsed : 0;
+        }
+
+        function formatMoney(value) {
+          return Math.round(value || 0).toLocaleString("vi-VN");
+        }
+
+        function updateTotalRow(totals, visibleCount) {
+          if (!totalRow) {
+            return;
+          }
+
+          totalRow.style.display = visibleCount > 0 ? "" : "none";
+
+          if (visibleCount === 0) {
+            return;
+          }
+
+          Object.keys(totals).forEach(function (fieldName) {
+            const target = totalRow.querySelector('[data-total-field="' + fieldName + '"]');
+            if (target) {
+              target.textContent = formatMoney(totals[fieldName]);
+            }
+          });
+        }
+
+        function showEmployeeDetails(employeeCode) {
+          const selectedCode = normalizeEmployeeCode(employeeCode);
+          let visibleCount = 0;
+          const totals = {
+            thucThu: 0,
+            huyPhieu: 0,
+            tienMat: 0,
+            chuyenKhoan: 0,
+            qr: 0,
+            pos: 0,
+            khongBangTienMat: 0
+          };
+
+          rows.forEach(function (row) {
+            const rowCode = normalizeEmployeeCode(row.dataset.employeeCode);
+            const matched = rowCode === selectedCode;
+            row.style.display = matched ? "" : "none";
+
+            if (matched) {
+              visibleCount += 1;
+              totals.thucThu += moneyNumber(row.dataset.thucThu);
+              totals.huyPhieu += moneyNumber(row.dataset.huyPhieu);
+              totals.tienMat += moneyNumber(row.dataset.tienMat);
+              totals.chuyenKhoan += moneyNumber(row.dataset.chuyenKhoan);
+              totals.qr += moneyNumber(row.dataset.qr);
+              totals.pos += moneyNumber(row.dataset.pos);
+              totals.khongBangTienMat += moneyNumber(row.dataset.khongBangTienMat);
+            }
+          });
+
+          buttons.forEach(function (button) {
+            const buttonCode = normalizeEmployeeCode(button.dataset.employeeCode);
+            if (buttonCode === selectedCode) {
+              button.classList.add("active");
+            } else {
+              button.classList.remove("active");
+            }
+          });
+
+          if (emptyNotice) {
+            emptyNotice.style.display = visibleCount === 0 && selectedCode ? "" : "none";
+          }
+
+          updateTotalRow(totals, visibleCount);
+        }
+
+        buttons.forEach(function (button) {
+          button.addEventListener("click", function () {
+            showEmployeeDetails(button.dataset.employeeCode);
+          });
+        });
+
+        if (buttons.length > 0) {
+          showEmployeeDetails(buttons[0].dataset.employeeCode);
+        }
+      }
+      bindEmployeeDetailViewer({
+        buttonSelector: ".js-his-employee-detail",
+        rowSelector: ".his-detail-row",
+        emptyNoticeId: "his-detail-empty-selected",
+        totalRowId: "his-detail-total-row"
+      });
+
+      bindEmployeeDetailViewer({
+        buttonSelector: ".js-non-cash-employee-detail",
+        rowSelector: ".non-cash-detail-row",
+        emptyNoticeId: "non-cash-detail-empty-selected",
+        totalRowId: "non-cash-detail-total-row"
+      });
+    });
+  </script>
+</div>
+
+{% elif active_main_tab == 'voucher' %}
+<div class="panel">
+  <h3>Lập Phiếu kiểm soát thu, chi tiền mặt</h3>
+  <p class="muted">
+    Sau khi chọn đúng bộ dữ liệu HIS, Sổ quỹ và Kế toán, bấm <b>Tạo và lưu nháp Phiếu kiểm soát</b>.
+    Phiếu sẽ được lưu thành bản nháp và chuyển sang trang chi tiết Phiếu để tiếp tục cập nhật,
+    kiểm tra, ký số nội bộ hoặc trình theo hình thức không ký số.
+  </p>
+</div>
+
+<div class="panel">
+  {% if user.role_code in ['TONG_GIAM_DOC','PHO_TGD_THUONG_TRUC','PHO_TONG_GIAM_DOC'] %}
+  <h3>Danh sách Phiếu kiểm soát thu, chi tiền mặt trình Hội đồng thành viên</h3>
+  {% else %}
+  <h3>Danh sách Phiếu kiểm soát thu, chi tiền mặt đã lưu</h3>
+  {% endif %}
+
+  {% if cash_control_new_count %}
+  <div class="cash-new-alert">
+    <span class="cash-new-alert-badge">{{ cash_control_new_count if cash_control_new_count <= 99 else '99+' }}</span>
+    <span>Phiếu kiểm soát mới chờ xử lý.</span>
+  </div>
+  {% endif %}
+
+  <form method="get" action="/cash-control" class="grid3" style="margin-bottom:12px;">
+    <input type="hidden" name="main_tab" value="voucher">
+
+    <div>
+      <label>Năm</label>
+      <select name="cash_voucher_year">
+        <option value="">Tất cả năm</option>
+        {% for y in cash_control_voucher_years %}
+        <option value="{{ y.year }}" {% if selected_cash_voucher_year == y.year %}selected{% endif %}>{{ y.year }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div>
+      <label>Tháng</label>
+      <select name="cash_voucher_month">
+        <option value="">Tất cả tháng</option>
+        {% for m in cash_control_voucher_months %}
+        <option value="{{ m }}" {% if selected_cash_voucher_month == m %}selected{% endif %}>Tháng {{ m }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div>
+      <label>Ngày</label>
+      <select name="cash_voucher_day">
+        <option value="">Tất cả ngày</option>
+        {% for d in cash_control_voucher_days %}
+        <option value="{{ d }}" {% if selected_cash_voucher_day == d %}selected{% endif %}>Ngày {{ d }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div style="grid-column:1/-1;">
+      <button class="primary cash-control-ui-font" type="submit">Lọc danh sách Phiếu</button>
+      <a class="secondary-link cash-control-ui-font" href="/cash-control?main_tab=voucher">Bỏ lọc</a>
+    </div>
+  </form>
+
+  <table class="table compact">
+    <thead>
+      <tr>
+        <th>Mã phiếu</th>
+        <th>Tên phiếu</th>
+        <th>Ngày/kỳ kiểm soát</th>
+        <th>Người tạo</th>
+        <th>Tổng số tiền</th>
+        <th>Tổng Ban KSNB kiểm tra</th>
+        <th>Trạng thái</th>
+        <th>Thời điểm tạo</th>
+        <th>Thao tác</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for v in cash_control_vouchers %}
+      <tr class="{% if v.is_new_for_current_user %}cash-new-row{% endif %}">
+        <td>
+          {{ v.code }}
+          {% if v.is_new_for_current_user %}
+          <span class="cash-new-inline-badge">Mới</span>
+          {% endif %}
+        </td>
+        <td>{{ v.title }}</td>
+        <td>{{ format_vn_control_date(v.voucher_date) }}</td>
+        <td>{{ v.creator_name }}</td>
+        <td class="num">{{ '{:,.0f}'.format((v.revenue_document_total or 0) + (v.expense_document_total or 0)).replace(',', '.') }}</td>
+        <td class="num">{{ '{:,.0f}'.format((v.revenue_ksnb_total or 0) + (v.expense_ksnb_total or 0)).replace(',', '.') }}</td>
+        <td><span class="badge">{{ cash_control_status_labels.get(v.status, v.status) }}</span></td>
+        <td>{{ format_vn_sqlite_datetime(v.created_at) }}</td>
+        <td>
+        <td>
+          {% if v.status == 'DRAFT' and (v.created_by == user.id or user.role_code == 'ADMIN') %}
+          <a href="/cash-control?main_tab=voucher&editing_voucher_id={{ v.id }}&his_batch_id={{ v.his_batch_id or '' }}&cashbook_batch_id={{ v.cashbook_batch_id or '' }}&accounting_batch_id={{ v.accounting_batch_id or '' }}">
+            Sửa nháp
+          </a>
+          |
+          <a href="/cash-control/vouchers/{{ v.id }}">Xem chi tiết</a>
+          {% else %}
+            {% if user.role_code in ['TONG_GIAM_DOC','PHO_TGD_THUONG_TRUC','PHO_TONG_GIAM_DOC'] %}
+          <a href="/cash-control/vouchers/{{ v.id }}/print">Xem</a>
+            {% else %}
+          <a href="/cash-control/vouchers/{{ v.id }}">Xem</a>
+            {% endif %}
+          {% endif %}
+          |
+          <a target="_blank" href="/cash-control/vouchers/{{ v.id }}/print">In</a>
+          {% if v.status not in ['SUBMITTED_TO_BOARD', 'BOARD_VIEWED', 'BOARD_SAVED'] and (v.created_by == user.id or user.role_code == 'ADMIN') %}
+          |
+          <form method="post" action="/cash-control/vouchers/{{ v.id }}/delete" style="display:inline;" onsubmit="return confirm('Anh chắc chắn muốn xóa Phiếu kiểm soát này? Thao tác này sẽ xóa Phiếu và các dòng chi tiết đã lưu, không áp dụng cho Phiếu đã trình Hội đồng thành viên.');">
+            <button type="submit" class="secondary" style="padding:3px 8px;">Xóa</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="9" class="empty">Chưa có Phiếu kiểm soát thu, chi tiền mặt đã lưu.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="panel">
+  <h3>Chọn bộ dữ liệu để tạo và lưu nháp Phiếu</h3>
+  <form method="get" action="/cash-control" class="grid3">
+    <input type="hidden" name="main_tab" value="voucher">
+    {% if editing_cash_voucher %}
+    <input type="hidden" name="editing_voucher_id" value="{{ editing_cash_voucher.id }}">
+    {% endif %}
+
+    <div>
+      <label>Dữ liệu doanh thu HIS</label>
+      <select name="his_batch_id">
+        {% for b in batches %}
+        <option value="{{ b.id }}" {% if selected_his_batch_id == b.id %}selected{% endif %}>
+          #{{ b.id }} - {{ b.original_filename }} - {{ format_vn_sqlite_datetime(b.created_at) }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div>
+      <label>Dữ liệu Sổ quỹ tiền mặt</label>
+      <select name="cashbook_batch_id">
+        {% for b in cashbook_batches %}
+        <option value="{{ b.id }}" {% if selected_cashbook_batch_id == b.id %}selected{% endif %}>
+          #{{ b.id }} - {{ b.original_filename }} - {{ format_vn_sqlite_datetime(b.created_at) }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div>
+      <label>Dữ liệu Báo cáo Kế toán</label>
+      <select name="accounting_batch_id">
+        {% for b in accounting_batches %}
+        <option value="{{ b.id }}" {% if selected_accounting_batch_id == b.id %}selected{% endif %}>
+          #{{ b.id }} - {{ b.original_filename }} - {{ format_vn_sqlite_datetime(b.created_at) }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div style="grid-column:1/-1;">
+      <button class="secondary cash-control-ui-font cash-btn-load-dataset" type="submit">Nạp bộ dữ liệu lập Phiếu</button>
+    </div>
+  </form>
+</div>
+
+<form method="post" action="{% if editing_cash_voucher %}/cash-control/vouchers/{{ editing_cash_voucher.id }}/basic/update{% else %}/cash-control/voucher/save{% endif %}">
+  <input type="hidden" name="his_batch_id" value="{{ selected_his_batch_id or '' }}">
+  <input type="hidden" name="cashbook_batch_id" value="{{ selected_cashbook_batch_id or '' }}">
+  <input type="hidden" name="accounting_batch_id" value="{{ selected_accounting_batch_id or '' }}">
+
+  <div class="panel">
+    <h3>{% if editing_cash_voucher %}I. Chỉnh sửa thông tin ban đầu của Phiếu nháp{% else %}I. Thông tin chung{% endif %}</h3>
+    <div class="grid2">
+      <div>
+        <label>Tên hồ sơ/kỳ kiểm soát</label>
+        <input value="Phiếu kiểm soát thu, chi tiền mặt" readonly>
+      </div>
+
+      <div>
+        <label>Ngày/kỳ kiểm soát</label>
+        <input
+          type="text"
+          name="voucher_date"
+          value="{% if editing_cash_voucher %}{{ format_vn_control_date(editing_cash_voucher.voucher_date) }}{% endif %}"
+          placeholder="dd/mm/yyyy"
+          pattern="^(0?[1-9]|[12][0-9]|3[01])/(0?[1-9]|1[0-2])/[0-9]{4}$"
+          title="Nhập ngày theo định dạng dd/mm/yyyy, ví dụ 16/05/2026"
+        >
+      </div>
+
+      <div>
+        <label>Người lập phiếu</label>
+        <input value="{{ user.full_name }}" readonly>
+      </div>
+
+      <div>
+        <label>Luồng trình</label>
+        <select name="route_mode">
+          <option value="THROUGH_HEAD" {% if editing_cash_voucher and editing_cash_voucher.route_mode == 'THROUGH_HEAD' %}selected{% endif %}>Nhân viên tạo phiếu → Trưởng/Phó Ban KSNB → HĐTV</option>
+          <option value="DIRECT_BOARD" {% if editing_cash_voucher and editing_cash_voucher.route_mode == 'DIRECT_BOARD' %}selected{% endif %}>Không trình Trưởng/Phó Ban KSNB → HĐTV</option>
+        </select>
+      </div>
+
+      <div>
+        <label>Trưởng/Phó Ban KSNB nhận trình</label>
+        <select name="head_user_id">
+          <option value="">-- Chọn khi trình qua Trưởng/Phó Ban --</option>
+          {% for h in cash_control_head_users %}
+          <option value="{{ h.id }}" {% if editing_cash_voucher and editing_cash_voucher.head_user_id == h.id %}selected{% endif %}>{{ h.full_name }} - {{ h.position_title }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div>
+        <label>Nguồn dữ liệu</label>
+        <input value="HIS #{{ selected_his_batch_id or '' }} / Sổ quỹ #{{ selected_cashbook_batch_id or '' }} / Kế toán #{{ selected_accounting_batch_id or '' }}" readonly>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h3>III. Bảng đối chiếu thu, chi tiền mặt</h3>
+    <p class="muted">
+      Đây là dữ liệu xem trước.
+      {% if editing_cash_voucher %}
+      Khi bấm <b>Lưu lại thông tin ban đầu của Phiếu nháp</b>, hệ thống sẽ cập nhật lại Ngày/kỳ kiểm soát, luồng trình, người nhận trình và bộ dữ liệu của Phiếu nháp đang sửa.
+      {% else %}
+      Khi bấm <b>Tạo và lưu nháp Phiếu kiểm soát</b>, hệ thống sẽ lưu Phiếu thành bản nháp và chuyển sang trang chi tiết Phiếu để tiếp tục cập nhật.
+      {% endif %}
+      Nếu cần đối chiếu thêm sau khi đã tạo Phiếu, hãy quay lại Phiếu từ danh sách Phiếu đã lưu hoặc từ nút “Quay lại Phiếu đang sửa”.
+    </p>
+
+    <h4>Thu: Gồm {{ cashbook_totals.get('receipt_count', 0)|int }} phiếu thu</h4>
+    <table class="table compact">
+      <thead>
+        <tr>
+          <th>STT</th>
+          <th>Khoản thu</th>
+          <th>Số tiền</th>
+          <th>Ban KSNB kiểm tra</th>
+          <th>Ghi chú</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in control_revenue_rows %}
+        <tr>
+          <td class="num">{{ loop.index }}</td>
+          <td>{{ r.item_name }}</td>
+          <td class="num">{{ '{:,.0f}'.format(r.document_amount or 0).replace(',', '.') }}</td>
+          <td class="num {% if r.diff_amount %}warning-cell{% endif %}">
+            {{ '{:,.0f}'.format(r.ksnb_amount or 0).replace(',', '.') }}
+          </td>
+          <td class="{% if r.diff_amount %}warning-cell{% endif %}">{{ r.note }}</td>
+        </tr>
+        {% endfor %}
+        <tr class="total-row">
+          <td colspan="2"><b>Tổng cộng</b></td>
+          <td class="num"><b>{{ '{:,.0f}'.format(control_revenue_total.document_amount or 0).replace(',', '.') }}</b></td>
+          <td class="num"><b>{{ '{:,.0f}'.format(control_revenue_total.ksnb_amount or 0).replace(',', '.') }}</b></td>
+          <td class="num {% if control_revenue_total.diff_amount %}warning-cell{% endif %}">
+            <b>{{ '{:,.0f}'.format(control_revenue_total.diff_amount or 0).replace(',', '.') }}</b>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h4 style="margin-top:16px;">
+      Chi: Gồm {{ cashbook_totals.get('expense_count', 0)|int }} phiếu chi,
+      trong đó {{ cashbook_totals.get('refund_kcb_count', 0)|int }} phiếu chi hoàn tiền KCB
+    </h4>
+    <table class="table compact">
+      <thead>
+        <tr>
+          <th>STT</th>
+          <th>Khoản chi</th>
+          <th>Số tiền</th>
+          <th>Ban KSNB kiểm tra</th>
+          <th>Ghi chú</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in control_expense_rows %}
+        <tr>
+          <td class="num">{{ loop.index }}</td>
+          <td>{{ r.item_name }}</td>
+          <td class="num">{{ '{:,.0f}'.format(r.document_amount or 0).replace(',', '.') }}</td>
+          <td class="num {% if r.diff_amount %}warning-cell{% endif %}">
+            {{ '{:,.0f}'.format(r.ksnb_amount or 0).replace(',', '.') }}
+          </td>
+          <td class="{% if r.diff_amount %}warning-cell{% endif %}">{{ r.note }}</td>
+        </tr>
+        {% endfor %}
+        <tr class="total-row">
+          <td colspan="2"><b>Tổng cộng</b></td>
+          <td class="num"><b>{{ '{:,.0f}'.format(control_expense_total.document_amount or 0).replace(',', '.') }}</b></td>
+          <td class="num"><b>{{ '{:,.0f}'.format(control_expense_total.ksnb_amount or 0).replace(',', '.') }}</b></td>
+          <td class="num {% if control_expense_total.diff_amount %}warning-cell{% endif %}">
+            <b>{{ '{:,.0f}'.format(control_expense_total.diff_amount or 0).replace(',', '.') }}</b>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="actions">
+    <button class="primary cash-control-ui-font" type="submit">
+      {% if editing_cash_voucher %}
+      Lưu lại thông tin ban đầu của Phiếu nháp
+      {% else %}
+      Lập và lưu nháp Phiếu kiểm soát
+      {% endif %}
+    </button>
+
+    {% if editing_cash_voucher %}
+    <a class="secondary-link cash-control-ui-font" href="/cash-control/vouchers/{{ editing_cash_voucher.id }}">Xem chi tiết Phiếu</a>
+    <a class="secondary-link cash-control-ui-font" href="/cash-control?main_tab=voucher">Hủy sửa phiếu nháp</a>
+    {% endif %}
+  </div>
+</form>
+{% endif %}
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    document.querySelectorAll(".cash-collapsible-panel > h3").forEach(function (heading) {
+      const panel = heading.closest(".cash-collapsible-panel");
+      if (!panel) {
+        return;
+      }
+
+      function syncState() {
+        const isCollapsed = panel.classList.contains("is-collapsed");
+        heading.setAttribute("aria-expanded", isCollapsed ? "false" : "true");
+      }
+
+      heading.setAttribute("role", "button");
+      heading.setAttribute("tabindex", "0");
+      syncState();
+
+      heading.addEventListener("click", function () {
+        panel.classList.toggle("is-collapsed");
+        syncState();
+      });
+
+      heading.addEventListener("keydown", function (event) {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          panel.classList.toggle("is-collapsed");
+          syncState();
+        }
+      });
+    });
+  });
+</script>
+{% endblock %}
