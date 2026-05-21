@@ -98,8 +98,9 @@
   <div class="title">Phiếu kiểm soát thu, chi tiền mặt</div>
 
   {% set raw_section_v_text = voucher.section_v_text or '' %}
-  {% set source_data_text = raw_section_v_text if raw_section_v_text.startswith('Nguồn dữ liệu kiểm soát:') else '' %}
-  {% set section_v_print_text = '' if source_data_text else raw_section_v_text %}
+  {% set context_source_data_text = source_data_text|default('') %}
+  {% set source_data_text = context_source_data_text if context_source_data_text else (raw_section_v_text if raw_section_v_text.startswith('Nguồn dữ liệu kiểm soát:') else '') %}
+  {% set section_v_print_text = '' if raw_section_v_text.startswith('Nguồn dữ liệu kiểm soát:') else raw_section_v_text %}
   {% set section_vi_print_text = voucher.section_vi_text or '' %}
   {% set section_no = namespace(value=4) %}
 

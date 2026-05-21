@@ -1348,11 +1348,17 @@ def fetch_full_cash_control_voucher(voucher_id: int) -> dict[str, Any]:
                    head.full_name AS head_name,
                    head.position_title AS head_position,
                    board.full_name AS board_name,
-                   board.position_title AS board_position
+                   board.position_title AS board_position,
+                   his.original_filename AS his_original_filename,
+                   cashbook.original_filename AS cashbook_original_filename,
+                   accounting.original_filename AS accounting_original_filename
             FROM cash_control_vouchers v
             JOIN users creator ON creator.id = v.created_by
             LEFT JOIN users head ON head.id = v.head_user_id
             LEFT JOIN users board ON board.id = v.board_user_id
+            LEFT JOIN cash_control_batches his ON his.id = v.his_batch_id
+            LEFT JOIN cash_control_cashbook_batches cashbook ON cashbook.id = v.cashbook_batch_id
+            LEFT JOIN cash_control_accounting_batches accounting ON accounting.id = v.accounting_batch_id
             WHERE v.id = ?
             """,
             (voucher_id,),
@@ -1413,6 +1419,23 @@ def fetch_full_cash_control_voucher(voucher_id: int) -> dict[str, Any]:
     document_total = sum(money_value(row["document_amount"]) for row in item_dicts)
     ksnb_total = sum(cash_control_item_check_amount(row) for row in item_dicts)
 
+    existing_source_text = str(voucher["section_v_text"] or "").strip()
+    source_data_text = existing_source_text if existing_source_text.startswith("Nguồn dữ liệu kiểm soát:") else ""
+
+    if not source_data_text:
+        source_note = []
+        if voucher["his_batch_id"]:
+            his_name = str(voucher["his_original_filename"] or "").strip()
+            source_note.append(f"HIS: #{voucher['his_batch_id']} - {his_name}" if his_name else f"HIS: #{voucher['his_batch_id']}")
+        if voucher["cashbook_batch_id"]:
+            cashbook_name = str(voucher["cashbook_original_filename"] or "").strip()
+            source_note.append(f"Sổ quỹ: #{voucher['cashbook_batch_id']} - {cashbook_name}" if cashbook_name else f"Sổ quỹ: #{voucher['cashbook_batch_id']}")
+        if voucher["accounting_batch_id"]:
+            accounting_name = str(voucher["accounting_original_filename"] or "").strip()
+            source_note.append(f"Kế toán: #{voucher['accounting_batch_id']} - {accounting_name}" if accounting_name else f"Kế toán: #{voucher['accounting_batch_id']}")
+
+        source_data_text = "Nguồn dữ liệu kiểm soát: " + "; ".join(source_note) if source_note else ""
+
     return {
         "voucher": voucher,
         "items": item_dicts,
@@ -1423,6 +1446,7 @@ def fetch_full_cash_control_voucher(voucher_id: int) -> dict[str, Any]:
         "document_total": document_total,
         "ksnb_total": ksnb_total,
         "diff_total": document_total - ksnb_total,
+        "source_data_text": source_data_text,
     }
 
 
@@ -2654,6 +2678,10 @@ async def cash_control_voucher_items_update(request: Request, voucher_id: int):
         section_iv_note = str(form.get("section_iv_note") or "").strip()
         section_v_text = str(form.get("section_v_text") or "").strip()
         section_vi_text = str(form.get("section_vi_text") or "").strip()
+
+        existing_source_text = str(voucher["section_v_text"] or "").strip()
+        if not section_v_text and existing_source_text.startswith("Nguồn dữ liệu kiểm soát:"):
+            section_v_text = existing_source_text
 
         conn.execute(
             """
