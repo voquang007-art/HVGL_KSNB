@@ -75,7 +75,7 @@ ACCOUNTING_REVENUE_ALIASES = {
     "Thu tiền Siêu Thị": ["sieu thi"],
     "Thu tiền Nhà Thuốc": ["nha thuoc"],
     "Thu tiền Hồ Sơ Bệnh Án": ["ho so benh an", "hsba", "giay chung nhan thuong tich"],
-    "Thu tiền khác": ["thu ung", "hoan ung", "thu khac", "ung nhan vien"],
+    "Thu tiền khác": ["thu ung", "hoan ung", "thu khac", "ung nhan vien", "gop von"],
 }
 
 VN_TZ = timezone(timedelta(hours=7))
@@ -618,6 +618,58 @@ def classify_accounting_revenue_item(label: Any) -> str | None:
 
     return None
 
+def is_accounting_other_revenue_summary_row(values: list[Any], first_text: str) -> bool:
+    if not first_text:
+        return False
+
+    if EMPLOYEE_LINE_RE.match(first_text):
+        return False
+
+    norm_first_text = normalize_text(first_text)
+
+    if norm_first_text in {"tong", "tong cong"}:
+        return False
+
+    if norm_first_text.startswith("tong thu"):
+        return False
+
+    accounting_cash_amount = money_value(values[6] if len(values) > 6 else None)
+    if accounting_cash_amount <= 0:
+        return False
+
+    accounting_bank_ml_amount = money_value(values[2] if len(values) > 2 else None)
+    accounting_qr_amount = money_value(values[3] if len(values) > 3 else None)
+    accounting_pos_amount = money_value(values[4] if len(values) > 4 else None)
+    accounting_report_non_cash_amount = money_value(values[5] if len(values) > 5 else None)
+    accounting_non_cash_diff_amount = money_value(values[7] if len(values) > 7 else None)
+    note_text = str(values[8] if len(values) > 8 and values[8] is not None else "").strip()
+
+    business_keywords = {
+        "thu",
+        "tien",
+        "gop",
+        "von",
+        "ho tro",
+        "tai tro",
+        "boi hoan",
+        "hoan tra",
+        "khac",
+        "dieu chinh",
+        "nop",
+    }
+
+    has_business_keyword = any(keyword in norm_first_text for keyword in business_keywords)
+
+    return (
+        has_business_keyword
+        and accounting_bank_ml_amount == 0
+        and accounting_qr_amount == 0
+        and accounting_pos_amount == 0
+        and accounting_report_non_cash_amount == 0
+        and accounting_non_cash_diff_amount == 0
+        and not note_text
+    )
+    
 
 def parse_accounting_excel(path: Path) -> dict[str, Any]:
     wb = load_workbook(path, data_only=True)
@@ -696,6 +748,16 @@ def parse_accounting_excel(path: Path) -> dict[str, Any]:
             summary_map[matched_item_name]["note"] = row_text
             continue
 
+        if is_accounting_other_revenue_summary_row(values, first_text):
+            accounting_cash_amount = money_value(values[6] if len(values) > 6 else None)
+            summary_map["Thu tiền khác"]["amount"] += accounting_cash_amount
+
+            existing_note = str(summary_map["Thu tiền khác"].get("note") or "").strip()
+            summary_map["Thu tiền khác"]["note"] = (
+                f"{existing_note}; {first_text}" if existing_note else first_text
+            )
+            continue
+
         if first_text and not EMPLOYEE_LINE_RE.match(first_text):
             accounting_cash_amount = money_value(values[6] if len(values) > 6 else None)
             if accounting_cash_amount > 0:
@@ -722,13 +784,6 @@ def parse_accounting_excel(path: Path) -> dict[str, Any]:
                         "note": str(values[8] if len(values) > 8 and values[8] is not None else "").strip(),
                     }
                 )
-                continue
-
-        matched_item_name = classify_accounting_revenue_item(row_text)
-        if matched_item_name:
-            amount = money_value(values[6] if len(values) > 6 else None)
-            summary_map[matched_item_name]["amount"] += amount
-            summary_map[matched_item_name]["note"] = row_text
             continue
 
         if "hoan" in norm_row_text and "kham" in norm_row_text and "chua benh" in norm_row_text:
@@ -2092,7 +2147,10 @@ def build_reconcile_context(
                 FROM cash_control_his_entries
                 WHERE batch_id = ?
                   AND employee_code IN ({placeholders})
-                  AND (COALESCE(chuyen_khoan, 0) + COALESCE(qr, 0) + COALESCE(pos, 0)) > 0
+                  AND (
+                      (COALESCE(chuyen_khoan, 0) + COALESCE(qr, 0) + COALESCE(pos, 0)) > 0
+                      OR COALESCE(huy_phieu, 0) > 0
+                  )
                 ORDER BY employee_code, patient_code, id
                 """,
                 [selected_his_batch_id, *discrepant_non_cash_employee_codes],
