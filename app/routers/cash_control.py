@@ -1146,7 +1146,41 @@ def load_cashbook_context(selected_cashbook_batch_id: int | None = None) -> dict
                 (selected_cashbook_batch["id"],),
             ).fetchall()
 
-    receipt_dicts = [dict(row) for row in receipt_rows]
+    raw_receipt_dicts = [dict(row) for row in receipt_rows]
+    receipt_by_name: dict[str, dict[str, Any]] = {}
+
+    for row in raw_receipt_dicts:
+        item_name = str(row.get("item_name") or "").strip()
+        if item_name == "Thu tiền Quầy kính":
+            item_name = "Thu tiền khám chữa bệnh"
+
+        if item_name not in receipt_by_name:
+            normalized_row = dict(row)
+            normalized_row["item_name"] = item_name
+            normalized_row["voucher_count"] = int(row.get("voucher_count") or 0)
+            normalized_row["amount"] = money_value(row.get("amount"))
+            receipt_by_name[item_name] = normalized_row
+        else:
+            receipt_by_name[item_name]["voucher_count"] = (
+                int(receipt_by_name[item_name].get("voucher_count") or 0)
+                + int(row.get("voucher_count") or 0)
+            )
+            receipt_by_name[item_name]["amount"] = (
+                money_value(receipt_by_name[item_name].get("amount"))
+                + money_value(row.get("amount"))
+            )
+
+    receipt_dicts = [
+        receipt_by_name[item_name]
+        for item_name in CASH_CONTROL_REVENUE_ITEMS
+        if item_name in receipt_by_name
+    ]
+    receipt_dicts.extend(
+        row
+        for item_name, row in receipt_by_name.items()
+        if item_name not in CASH_CONTROL_REVENUE_ITEMS
+    )
+
     expense_dicts = [dict(row) for row in expense_rows]
 
     receipt_count = sum(int(row.get("voucher_count") or 0) for row in receipt_dicts)
