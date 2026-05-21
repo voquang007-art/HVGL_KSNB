@@ -29,7 +29,6 @@ EMPLOYEE_LINE_RE = re.compile(r"^\s*(\d+)\s*[-–]\s*(.+?)\s*$")
 
 CASH_CONTROL_REVENUE_ITEMS = [
     "Thu tiền khám chữa bệnh",
-    "Thu tiền Quầy kính",
     "Thu tiền Căn tin",
     "Thu tiền tiêm chủng",
     "Thu tiền Da Liễu",
@@ -211,10 +210,8 @@ def classify_cash_receipt(counterparty_credit_code: Any, description: Any) -> st
     code = str(counterparty_credit_code or "").strip().upper()
     desc = normalize_text(description)
 
-    if code in {"KHACHKCB", "KSKSK", "KLKSK", "THAMMY"}:
+    if code in {"KHACHKCB", "KSKSK", "KLKSK", "THAMMY", "QUAYKINH"}:
         return "Thu tiền khám chữa bệnh"
-    if code == "QUAYKINH":
-        return "Thu tiền Quầy kính"
     if code == "CANTIN":
         return "Thu tiền Căn tin"
     if code == "TIEMCHUNG":
@@ -1371,7 +1368,11 @@ def fetch_full_cash_control_voucher(voucher_id: int) -> dict[str, Any]:
             (voucher_id,),
         ).fetchall()
 
-    item_dicts = [dict(row) for row in items]
+    item_dicts = [
+        dict(row)
+        for row in items
+        if str(row["item_name"] or "").strip() != "Thu tiền Quầy kính"
+    ]
     revenue_items = [row for row in item_dicts if row["group_type"] == "REVENUE"]
     expense_items = [row for row in item_dicts if row["group_type"] == "EXPENSE"]
 
@@ -2567,11 +2568,19 @@ async def cash_control_voucher_items_update(request: Request, voucher_id: int):
     }
 
     with get_conn() as conn:
+        conn.execute(
+            """
+            DELETE FROM cash_control_voucher_items
+            WHERE voucher_id = ?
+              AND item_name = 'Thu tiền Quầy kính'
+            """,
+            (voucher_id,),
+        )
+
         items = conn.execute(
             "SELECT * FROM cash_control_voucher_items WHERE voucher_id = ? ORDER BY group_type, item_order",
             (voucher_id,),
         ).fetchall()
-
         for item in items:
             item_id = item["id"]
             check_type = str(form.get(f"check_type_{item_id}") or "MATCH").strip()
