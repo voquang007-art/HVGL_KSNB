@@ -232,9 +232,9 @@
   {% endif %}
 
   <div class="section-title">IV. Kết quả kiểm soát trước</div>
-  <div class="indent">{{ voucher.section_iv_result or '' }}</div>
+  <div class="indent"><b>{{ voucher.section_iv_result or '' }}</b></div>
   {% if voucher.section_iv_note %}
-  <div class="indent">{{ voucher.section_iv_note }}</div>
+  <div class="indent"><b><i>{{ voucher.section_iv_note }}</i></b></div>
   {% endif %}
 
   {% set section_no.value = 5 %}

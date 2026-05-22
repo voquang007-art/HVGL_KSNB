@@ -137,17 +137,59 @@ def parse_von_tu_co_xlsx(path: Path) -> list[dict[str, Any]]:
         ws,
         {
             "MA",
+            "MA DTPN",
             "NHA CUNG CAP",
             "NOI DUNG",
             "SO TIEN",
+            "DA THUC HIEN",
         },
     )
 
     if header_row:
-        code_col = _find_column(columns, ["Mã", "Ma", "Mã đối tượng", "Ma doi tuong"])
-        supplier_col = _find_column(columns, ["Nhà cung cấp", "Nha cung cap", "Tên nhà cung cấp", "Ten nha cung cap"]) or 1
-        content_col = _find_column(columns, ["Nội dung", "Noi dung", "Diễn giải", "Dien giai"]) or 2
-        amount_col = _find_column(columns, ["Số tiền", "So tien", "Số tiền thanh toán", "So tien thanh toan"]) or 3
+        code_col = _find_column(
+            columns,
+            [
+                "Mã",
+                "Ma",
+                "Mã ĐTPN",
+                "Ma DTPN",
+                "Mã đối tượng",
+                "Ma doi tuong",
+            ],
+        )
+        supplier_col = _find_column(
+            columns,
+            [
+                "Nhà cung cấp",
+                "Nha cung cap",
+                "Tên nhà cung cấp",
+                "Ten nha cung cap",
+            ],
+        ) or 1
+        content_col = _find_column(
+            columns,
+            [
+                "Nội dung",
+                "Noi dung",
+                "Diễn giải",
+                "Dien giai",
+            ],
+        ) or 2
+        amount_col = _find_column(
+            columns,
+            [
+                "Số tiền",
+                "So tien",
+                "Số tiền thanh toán",
+                "So tien thanh toan",
+                "Đã thực hiện",
+                "Da thuc hien",
+                "Số đã thực hiện",
+                "So da thuc hien",
+                "Đã thanh toán",
+                "Da thanh toan",
+            ],
+        ) or 4
         start_row = header_row + 1
     else:
         code_col = None
