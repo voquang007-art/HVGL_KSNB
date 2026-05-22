@@ -79,7 +79,7 @@
       <div class="head-underline"></div>
       {% set print_datetime = format_vn_sqlite_datetime(voucher.created_at) %}
       {% set print_date_parts = print_datetime.split(' ')[0].split('/') if print_datetime else [] %}
-      {% set print_time_text = print_datetime.split(' ')[1] if print_datetime and ' ' in print_datetime else '' %}
+      {% set print_time_text = format_vn_sqlite_time_text(voucher.created_at) %}
       <div class="date-line">
         <div class="date-line-inner">
           {% if print_date_parts|length == 3 %}
@@ -273,7 +273,9 @@
       <div class="sign-blank"></div>
       <div>{{ creator_sig[0].signer_name }}</div>
         {% else %}
-      <div class="sign-content">{{ creator_sig[0].signature_text }}</div>
+      <div class="sign-content">{{ creator_sig[0].signature_text }}{% if creator_sig[0].signed_at_vn_text %}
+
+Ký lúc: {{ creator_sig[0].signed_at_vn_text }}{% endif %}</div>
         {% endif %}
       {% else %}
       <div class="sign-blank"></div>
@@ -290,10 +292,14 @@
       <div class="sign-blank"></div>
       <div>{{ head_sig[0].signer_name }}</div>
         {% else %}
-      <div class="sign-content">{{ head_sig[0].signature_text }}</div>
+      <div class="sign-content">{{ head_sig[0].signature_text }}{% if head_sig[0].signed_at_vn_text %}
+
+Ký lúc: {{ head_sig[0].signed_at_vn_text }}{% endif %}</div>
         {% endif %}
       {% elif delegated_sig %}
-      <div class="sign-content">{{ delegated_sig[0].signature_text }}</div>
+      <div class="sign-content">{{ delegated_sig[0].signature_text }}{% if delegated_sig[0].signed_at_vn_text %}
+
+Ký lúc: {{ delegated_sig[0].signed_at_vn_text }}{% endif %}</div>
       {% else %}
       <div class="sign-blank"></div>
       <div>{{ voucher.head_name or '' }}</div>
@@ -316,7 +322,7 @@
       <tbody>
         {% for r in routes %}
         <tr>
-          <td>{{ r.created_at }}</td>
+          <td>{{ r.created_at_vn_text or r.created_at }}</td>
           <td>{{ r.action }}</td>
           <td>{{ r.from_name or '' }}</td>
           <td>{{ r.to_name or '' }}</td>

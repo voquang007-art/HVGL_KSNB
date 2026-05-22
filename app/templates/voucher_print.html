@@ -225,7 +225,7 @@
           <div class="sign-blank"></div>
           <div>{{ s.signer_name }}</div>
           {% else %}
-          <div class="sign-content"><b>Ký số nội bộ</b><br>{{ s.signed_at }}<br>{{ s.signer_name }}</div>
+          <div class="sign-content">{{ s.signature_text }}<br>Ký lúc {{ s.signed_at_vn_text or s.signed_at }}</div>
           {% endif %}
         {% endif %}
       {% endfor %}
@@ -244,7 +244,7 @@
           {% elif voucher.route_mode == 'DIRECT_BOARD' %}
           <div class="sign-content">{{ delegation_text }}</div>
           {% else %}
-          <div class="sign-content"><b>Ký số nội bộ</b><br>{{ s.signed_at }}<br>{{ s.signer_name }}</div>
+          <div class="sign-content">{{ s.signature_text }}<br>Ký lúc {{ s.signed_at_vn_text or s.signed_at }}</div>
           {% endif %}
         {% endif %}
       {% endfor %}
@@ -257,7 +257,7 @@
   <div class="route-history">
     <b>Lịch sử luân chuyển</b><br>
     {% for r in routes %}
-    <div>- {{ r.created_at }} | {{ r.action }}{% if r.from_name %} | Từ: {{ r.from_name }}{% endif %}{% if r.to_name %} | Đến: {{ r.to_name }}{% endif %}{% if r.note %} | {{ r.note }}{% endif %}</div>
+    <div>- {{ r.created_at_vn_text or r.created_at }} | {{ r.action }}{% if r.from_name %} | Từ: {{ r.from_name }}{% endif %}{% if r.to_name %} | Đến: {{ r.to_name }}{% endif %}{% if r.note %} | {{ r.note }}{% endif %}</div>
     {% else %}
     <span>Chưa có luân chuyển.</span>
     {% endfor %}

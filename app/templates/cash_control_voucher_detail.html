@@ -216,7 +216,7 @@
         <td>{{ s.signer_name }}</td>
         <td>{{ s.signer_role }}</td>
         <td><pre>{{ s.signature_text }}</pre></td>
-        <td>{{ s.signed_at }}</td>
+        <td>{{ s.signed_at_vn_text or s.signed_at }}</td>
       </tr>
       {% else %}
       <tr><td colspan="4" class="empty">Chưa có chữ ký.</td></tr>
@@ -303,7 +303,7 @@
     <tbody>
       {% for r in routes %}
       <tr>
-        <td>{{ r.created_at }}</td>
+        <td>{{ r.created_at_vn_text or r.created_at }}</td>
         <td>{{ r.action }}</td>
         <td>{{ r.from_name or '' }}</td>
         <td>{{ r.to_name or '' }}</td>

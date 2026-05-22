@@ -93,21 +93,66 @@ def _save_cash_control_import_upload(upload: UploadFile, stored_path: Path) -> s
         raise ValueError(str(ex)) from ex
     return original_name
     
-def format_vn_sqlite_datetime(value: Any) -> str:
+def parse_sqlite_datetime_to_vn(value: Any) -> datetime | None:
     text = str(value or "").strip()
     if not text:
-        return ""
+        return None
+
+    normalized_text = text.replace("T", " ")
+    if normalized_text.endswith("Z"):
+        normalized_text = normalized_text[:-1] + "+00:00"
 
     try:
-        parsed = datetime.fromisoformat(text)
+        parsed = datetime.fromisoformat(normalized_text)
     except ValueError:
-        return text
+        for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%d/%m/%Y %H:%M:%S", "%d/%m/%Y %H:%M"):
+            try:
+                parsed = datetime.strptime(normalized_text, fmt)
+                break
+            except ValueError:
+                continue
+        else:
+            return None
 
-    if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=timezone.utc)
+    if parsed.tzinfo is not None:
+        return parsed.astimezone(VN_TZ)
 
-    vn_time = parsed.astimezone(VN_TZ)
+    return parsed
+
+
+def format_vn_sqlite_datetime(value: Any) -> str:
+    vn_time = parse_sqlite_datetime_to_vn(value)
+    if not vn_time:
+        return str(value or "").strip()
+
     return vn_time.strftime("%d/%m/%Y %H:%M:%S")
+
+
+def format_vn_sqlite_time_text(value: Any) -> str:
+    vn_time = parse_sqlite_datetime_to_vn(value)
+    if not vn_time:
+        return ""
+
+    return f"{vn_time.hour:02d} giờ {vn_time.minute:02d} phút"
+
+
+def format_vn_sqlite_datetime_text(value: Any) -> str:
+    vn_time = parse_sqlite_datetime_to_vn(value)
+    if not vn_time:
+        return str(value or "").strip()
+
+    return (
+        f"{vn_time.hour:02d} giờ {vn_time.minute:02d} phút, "
+        f"ngày {vn_time.day:02d}/{vn_time.month:02d}/{vn_time.year:04d}"
+    )
+
+
+def vn_now_text() -> str:
+    return datetime.now(VN_TZ).replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+
+
+def vn_now_iso_text() -> str:
+    return vn_now_text()
     
 
 def format_vn_control_date(value: Any) -> str:
@@ -1491,13 +1536,25 @@ def fetch_full_cash_control_voucher(voucher_id: int) -> dict[str, Any]:
 
         source_data_text = "Nguồn dữ liệu kiểm soát: " + "; ".join(source_note) if source_note else ""
 
+    signature_dicts = []
+    for row in signatures:
+        item = dict(row)
+        item["signed_at_vn_text"] = format_vn_sqlite_datetime_text(item.get("signed_at"))
+        signature_dicts.append(item)
+
+    route_dicts = []
+    for row in routes:
+        item = dict(row)
+        item["created_at_vn_text"] = format_vn_sqlite_datetime_text(item.get("created_at"))
+        route_dicts.append(item)
+
     return {
         "voucher": voucher,
         "items": item_dicts,
         "revenue_items": revenue_items,
         "expense_items": expense_items,
-        "signatures": signatures,
-        "routes": routes,
+        "signatures": signature_dicts,
+        "routes": route_dicts,
         "document_total": document_total,
         "ksnb_total": ksnb_total,
         "diff_total": document_total - ksnb_total,
@@ -1582,6 +1639,7 @@ def save_cash_control_voucher_record(
     section_v_text = "Nguồn dữ liệu kiểm soát: " + "; ".join(source_note) if source_note else ""
 
     with get_conn() as conn:
+        now_vn = vn_now_text()        
         cur = conn.execute(
             """
             INSERT INTO cash_control_vouchers(
@@ -1591,9 +1649,9 @@ def save_cash_control_voucher_record(
                 revenue_document_total, revenue_ksnb_total, revenue_diff_total,
                 expense_document_total, expense_ksnb_total, expense_diff_total,
                 section_iv_result, section_iv_note, section_v_text, section_vi_text,
-                status, created_by
+                status, created_by, created_at
             )
-            VALUES (?, ?, 'INTERNAL_DIGITAL', ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', 'DRAFT', ?)
+            VALUES (?, ?, 'INTERNAL_DIGITAL', ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', 'DRAFT', ?, ?)
             """,
             (
                 title,
@@ -1617,6 +1675,7 @@ def save_cash_control_voucher_record(
                 section_iv_note,
                 section_v_text,
                 user["id"],
+                now_vn,
             ),
         )
         voucher_id = cur.lastrowid
@@ -1677,14 +1736,15 @@ def save_cash_control_voucher_record(
 
         conn.execute(
             """
-            INSERT INTO cash_control_voucher_routes(voucher_id, action, from_user_id, to_user_id, note)
-            VALUES (?, 'TAO_PHIEU', ?, ?, ?)
+            INSERT INTO cash_control_voucher_routes(voucher_id, action, from_user_id, to_user_id, note, created_at)
+            VALUES (?, 'TAO_PHIEU', ?, ?, ?, ?)
             """,
             (
                 voucher_id,
                 user["id"],
                 head_user_id if route_mode == "THROUGH_HEAD" else None,
                 "Tạo Phiếu kiểm soát thu, chi tiền mặt",
+                now_vn,
             ),
         )
         conn.commit()
@@ -1747,6 +1807,7 @@ def update_cash_control_voucher_basic_record(
     section_v_text = "Nguồn dữ liệu kiểm soát: " + "; ".join(source_note) if source_note else ""
 
     with get_conn() as conn:
+        now_vn = vn_now_text()        
         existing_voucher = conn.execute(
             """
             SELECT section_iv_result, section_iv_note, section_v_text, section_vi_text
@@ -1872,14 +1933,15 @@ def update_cash_control_voucher_basic_record(
 
         conn.execute(
             """
-            INSERT INTO cash_control_voucher_routes(voucher_id, action, from_user_id, to_user_id, note)
-            VALUES (?, 'CAP_NHAT_NHAP', ?, ?, ?)
+            INSERT INTO cash_control_voucher_routes(voucher_id, action, from_user_id, to_user_id, note, created_at)
+            VALUES (?, 'CAP_NHAT_NHAP', ?, ?, ?, ?)
             """,
             (
                 voucher_id,
                 user["id"],
                 head_user_id if route_mode == "THROUGH_HEAD" else None,
                 "Cập nhật thông tin ban đầu của Phiếu nháp",
+                now_vn,
             ),
         )
         conn.commit()
@@ -2548,16 +2610,17 @@ def cash_control_voucher_print(request: Request, voucher_id: int):
                 or current_voucher["board_user_id"] == user["id"]
                 or current_voucher["current_handler"] is None
             ):
+                now_vn = vn_now_text()
                 conn.execute(
                     "UPDATE cash_control_vouchers SET status = 'BOARD_VIEWED', current_handler = NULL WHERE id = ?",
                     (voucher_id,),
                 )
                 conn.execute(
                     """
-                    INSERT INTO cash_control_voucher_routes(voucher_id, action, from_user_id, note)
-                    VALUES (?, 'HDTV_XEM_PHIEU', ?, ?)
+                    INSERT INTO cash_control_voucher_routes(voucher_id, action, from_user_id, note, created_at)
+                    VALUES (?, 'HDTV_XEM_PHIEU', ?, ?, ?)
                     """,
-                    (voucher_id, user["id"], "HĐTV đã mở xem Phiếu kiểm soát thu, chi tiền mặt."),
+                    (voucher_id, user["id"], "HĐTV đã mở xem Phiếu kiểm soát thu, chi tiền mặt.", now_vn),
                 )
                 conn.commit()
                 data = fetch_full_cash_control_voucher(voucher_id)
@@ -2600,6 +2663,7 @@ def cash_control_voucher_print(request: Request, voucher_id: int):
             "request": request,
             "user": request.state.user,
             "format_vn_sqlite_datetime": format_vn_sqlite_datetime,
+            "format_vn_sqlite_time_text": format_vn_sqlite_time_text,
             "cash_control_status_labels": CASH_CONTROL_STATUS_LABELS,
             **data,
         },
@@ -2810,6 +2874,7 @@ def cash_control_voucher_submit_no_signature(
         return RedirectResponse(f"/cash-control/vouchers/{voucher_id}", status_code=303)
 
     with get_conn() as conn:
+        now_vn = vn_now_text()       
         voucher = conn.execute(
             "SELECT * FROM cash_control_vouchers WHERE id = ?",
             (voucher_id,),
@@ -2837,48 +2902,50 @@ def cash_control_voucher_submit_no_signature(
         conn.execute(
             """
             INSERT INTO cash_control_voucher_signatures(
-                voucher_id, signer_id, signer_name, signer_role, signature_text
+                voucher_id, signer_id, signer_name, signer_role, signature_text, signed_at
             )
-            VALUES (?, ?, ?, 'NGUOI_KIEM_SOAT', ?)
+            VALUES (?, ?, ?, 'NGUOI_KIEM_SOAT', ?, ?)
             """,
-            (voucher_id, user["id"], user["full_name"], cash_control_no_signature_text(user)),
+            (voucher_id, user["id"], user["full_name"], cash_control_no_signature_text(user), now_vn),
         )
         conn.execute(
             """
             INSERT INTO cash_control_voucher_signatures(
-                voucher_id, signer_id, signer_name, signer_role, signature_text
+                voucher_id, signer_id, signer_name, signer_role, signature_text, signed_at
             )
-            VALUES (?, ?, ?, 'TRUONG_BAN', ?)
+            VALUES (?, ?, ?, 'TRUONG_BAN', ?, ?)
             """,
             (
                 voucher_id,
                 head_user["id"],
                 head_user["full_name"],
                 cash_control_no_signature_text(head_user),
+                now_vn,
             ),
         )
         conn.execute(
             """
             UPDATE cash_control_vouchers
             SET status = 'NO_SIGNATURE_INTERNAL',
-                submitted_at = CURRENT_TIMESTAMP,
+                submitted_at = ?,
                 submitted_to_board_at = NULL,
                 board_user_id = NULL,
                 current_handler = NULL
             WHERE id = ?
             """,
-            (voucher_id,),
+            (now_vn, voucher_id),
         )
         conn.execute(
             """
-            INSERT INTO cash_control_voucher_routes(voucher_id, action, from_user_id, to_user_id, note)
-            VALUES (?, 'KHONG_KY_SO_LUU_NOI_BO', ?, ?, ?)
+            INSERT INTO cash_control_voucher_routes(voucher_id, action, from_user_id, to_user_id, note, created_at)
+            VALUES (?, 'KHONG_KY_SO_LUU_NOI_BO', ?, ?, ?, ?)
             """,
             (
                 voucher_id,
                 user["id"],
                 head_user["id"],
                 "Không ký số; in tên người kiểm soát và Trưởng/Phó Ban KSNB trên Phiếu. Phiếu lưu nội bộ, không trình HĐTV.",
+                now_vn,
             ),
         )
         conn.commit()
@@ -2900,6 +2967,7 @@ def cash_control_voucher_submit(
     user = request.state.user
 
     with get_conn() as conn:
+        now_vn = vn_now_text()        
         voucher = conn.execute("SELECT * FROM cash_control_vouchers WHERE id = ?", (voucher_id,)).fetchone()
         if not voucher or voucher["created_by"] != user["id"] or voucher["status"] != "DRAFT":
             return RedirectResponse(f"/cash-control/vouchers/{voucher_id}", status_code=303)
@@ -2930,11 +2998,11 @@ def cash_control_voucher_submit(
         conn.execute(
             """
             INSERT INTO cash_control_voucher_signatures(
-                voucher_id, signer_id, signer_name, signer_role, signature_text
+                voucher_id, signer_id, signer_name, signer_role, signature_text, signed_at
             )
-            VALUES (?, ?, ?, 'NGUOI_KIEM_SOAT', ?)
+            VALUES (?, ?, ?, 'NGUOI_KIEM_SOAT', ?, ?)
             """,
-            (voucher_id, user["id"], user["full_name"], cash_control_signature_text(user)),
+            (voucher_id, user["id"], user["full_name"], cash_control_signature_text(user), now_vn),
         )
 
         if voucher["route_mode"] == "DIRECT_BOARD":
@@ -2942,68 +3010,70 @@ def cash_control_voucher_submit(
                 conn.execute(
                     """
                     INSERT INTO cash_control_voucher_signatures(
-                        voucher_id, signer_id, signer_name, signer_role, signature_text
+                        voucher_id, signer_id, signer_name, signer_role, signature_text, signed_at
                     )
-                    VALUES (?, ?, ?, 'TRUONG_BAN', ?)
+                    VALUES (?, ?, ?, 'TRUONG_BAN', ?, ?)
                     """,
                     (
                         voucher_id,
                         user["id"],
                         user["full_name"],
                         cash_control_signature_text(user),
+                        now_vn,
                     ),
                 )
             else:
                 conn.execute(
                     """
                     INSERT INTO cash_control_voucher_signatures(
-                        voucher_id, signer_id, signer_name, signer_role, signature_text
+                        voucher_id, signer_id, signer_name, signer_role, signature_text, signed_at
                     )
-                    VALUES (?, ?, ?, 'TRUONG_BAN_UY_QUYEN', ?)
+                    VALUES (?, ?, ?, 'TRUONG_BAN_UY_QUYEN', ?, ?)
                     """,
                     (
                         voucher_id,
                         user["id"],
                         "Trưởng Ban Kiểm soát nội bộ",
                         "Đã ủy quyền. Đồng ý với nội dung kiểm tra",
+                        now_vn,
                     ),
                 )
             conn.execute(
                 """
                 UPDATE cash_control_vouchers
                 SET status = 'SUBMITTED_TO_BOARD',
-                    submitted_at = CURRENT_TIMESTAMP,
-                    submitted_to_board_at = CURRENT_TIMESTAMP,
+                    submitted_at = ?,
+                    submitted_to_board_at = ?,
                     board_user_id = ?,
                     current_handler = ?
                 WHERE id = ?
                 """,
-                (board_user["id"], board_user["id"], voucher_id),
+                (now_vn, now_vn, board_user["id"], board_user["id"], voucher_id),
             )
             conn.execute(
                 """
-                INSERT INTO cash_control_voucher_routes(voucher_id, action, from_user_id, to_user_id, note)
-                VALUES (?, 'TRINH_THANG_HDTV', ?, ?, ?)
+                INSERT INTO cash_control_voucher_routes(voucher_id, action, from_user_id, to_user_id, note, created_at)
+                VALUES (?, 'TRINH_THANG_HDTV', ?, ?, ?, ?)
                 """,
-                (voucher_id, user["id"], board_user["id"], "Người kiểm soát ký số nội bộ và trình thẳng HĐTV"),
+                (voucher_id, user["id"], board_user["id"], "Người kiểm soát ký số nội bộ và trình thẳng HĐTV", now_vn),
             )
         else:
             conn.execute(
                 """
                 UPDATE cash_control_vouchers
                 SET status = 'SUBMITTED_TO_HEAD',
-                    submitted_at = CURRENT_TIMESTAMP,
+                    submitted_at = ?,
                     current_handler = head_user_id
                 WHERE id = ?
                 """,
-                (voucher_id,),
+                (now_vn, voucher_id),
             )
             conn.execute(
                 """
-                INSERT INTO cash_control_voucher_routes(voucher_id, action, from_user_id, to_user_id, note)
-                VALUES (?, 'TRINH_TRUONG_BAN', ?, ?, ?)
+                INSERT INTO cash_control_voucher_routes(voucher_id, action, from_user_id, to_user_id, note, created_at)
+                VALUES (?, 'TRINH_TRUONG_BAN', ?, ?, ?, ?)
                 """,
-                (voucher_id, user["id"], voucher["head_user_id"], "Người kiểm soát trình Trưởng/Phó Ban KSNB"),
+                (voucher_id, user["id"], voucher["head_user_id"], "Người kiểm soát trình Trưởng/Phó Ban KSNB", now_vn),
             )
 
         conn.commit()
@@ -3035,6 +3105,7 @@ def cash_control_voucher_head_approve(
         return RedirectResponse(f"/cash-control/vouchers/{voucher_id}", status_code=303)
 
     with get_conn() as conn:
+        now_vn = vn_now_text()
         voucher = conn.execute("SELECT * FROM cash_control_vouchers WHERE id = ?", (voucher_id,)).fetchone()
         if not voucher or voucher["status"] != "SUBMITTED_TO_HEAD":
             return RedirectResponse(f"/cash-control/vouchers/{voucher_id}", status_code=303)
@@ -3055,33 +3126,34 @@ def cash_control_voucher_head_approve(
         conn.execute(
             """
             INSERT INTO cash_control_voucher_signatures(
-                voucher_id, signer_id, signer_name, signer_role, signature_text
+                voucher_id, signer_id, signer_name, signer_role, signature_text, signed_at
             )
-            VALUES (?, ?, ?, 'TRUONG_BAN', ?)
+            VALUES (?, ?, ?, 'TRUONG_BAN', ?, ?)
             """,
-            (voucher_id, user["id"], user["full_name"], cash_control_signature_text(user)),
+            (voucher_id, user["id"], user["full_name"], cash_control_signature_text(user), now_vn),
         )
         conn.execute(
             """
             UPDATE cash_control_vouchers
             SET status = 'SUBMITTED_TO_BOARD',
-                submitted_to_board_at = CURRENT_TIMESTAMP,
+                submitted_to_board_at = ?,
                 board_user_id = ?,
                 current_handler = ?
             WHERE id = ?
             """,
-            (board_user["id"], board_user["id"], voucher_id),
+             (now_vn, board_user["id"], board_user["id"], voucher_id),
         )
         conn.execute(
             """
-            INSERT INTO cash_control_voucher_routes(voucher_id, action, from_user_id, to_user_id, note)
-            VALUES (?, 'TRUONG_BAN_TRINH_HDTV', ?, ?, ?)
+            INSERT INTO cash_control_voucher_routes(voucher_id, action, from_user_id, to_user_id, note, created_at)
+            VALUES (?, 'TRUONG_BAN_TRINH_HDTV', ?, ?, ?, ?)
             """,
             (
                 voucher_id,
                 user["id"],
                 board_user["id"],
                 "Trưởng/Phó Ban KSNB ký số nội bộ và trình Hội đồng thành viên.",
+                now_vn,
             ),
         )
         conn.commit()
@@ -3100,6 +3172,7 @@ def cash_control_voucher_board_save(request: Request, voucher_id: int):
         return RedirectResponse(f"/cash-control/vouchers/{voucher_id}", status_code=303)
 
     with get_conn() as conn:
+        now_vn = vn_now_text()       
         voucher = conn.execute("SELECT * FROM cash_control_vouchers WHERE id = ?", (voucher_id,)).fetchone()
         if not voucher or voucher["status"] not in {"SUBMITTED_TO_BOARD", "BOARD_VIEWED"}:
             return RedirectResponse(f"/cash-control/vouchers/{voucher_id}", status_code=303)
@@ -3108,17 +3181,17 @@ def cash_control_voucher_board_save(request: Request, voucher_id: int):
             """
             UPDATE cash_control_vouchers
             SET status = 'BOARD_SAVED',
-                board_saved_at = CURRENT_TIMESTAMP
+                board_saved_at = ?
             WHERE id = ?
             """,
-            (voucher_id,),
+            (now_vn, voucher_id),
         )
         conn.execute(
             """
-            INSERT INTO cash_control_voucher_routes(voucher_id, action, from_user_id, note)
-            VALUES (?, 'HDTV_LUU_PHIEU', ?, ?)
+            INSERT INTO cash_control_voucher_routes(voucher_id, action, from_user_id, note, created_at)
+            VALUES (?, 'HDTV_LUU_PHIEU', ?, ?, ?)
             """,
-            (voucher_id, user["id"], "HĐTV đã xem và lưu Phiếu kiểm soát thu, chi tiền mặt"),
+            (voucher_id, user["id"], "HĐTV đã xem và lưu Phiếu kiểm soát thu, chi tiền mặt", now_vn),
         )
         conn.commit()
 
@@ -3162,13 +3235,14 @@ async def accounting_import_replace(request: Request, batch_id: int, accounting_
             UPDATE cash_control_accounting_batches
             SET original_filename = ?,
                 created_by = ?,
-                created_at = CURRENT_TIMESTAMP,
+                created_at = ?,
                 accounting_non_cash_diff_total = ?
             WHERE id = ?
             """,
             (
                 original_name,
                 user["id"],
+                vn_now_text(),
                 money_value(parsed.get("accounting_non_cash_diff_total")),
                 batch_id,
             ),
@@ -3347,8 +3421,8 @@ async def cashbook_import_replace(request: Request, batch_id: int, cashbook_file
         conn.execute("DELETE FROM cash_control_cashbook_summaries WHERE batch_id = ?", (batch_id,))
         conn.execute("DELETE FROM cash_control_cashbook_entries WHERE batch_id = ?", (batch_id,))
         conn.execute(
-            "UPDATE cash_control_cashbook_batches SET original_filename = ?, created_by = ?, created_at = CURRENT_TIMESTAMP WHERE id = ?",
-            (original_name, user["id"], batch_id),
+            "UPDATE cash_control_cashbook_batches SET original_filename = ?, created_by = ?, created_at = ? WHERE id = ?",
+            (original_name, user["id"], vn_now_text(), batch_id),
         )
 
         for item in parsed["receipt_rows"]:
@@ -3515,8 +3589,8 @@ async def cash_control_import_replace(request: Request, batch_id: int, revenue_f
         conn.execute("DELETE FROM cash_control_employee_summaries WHERE batch_id = ?", (batch_id,))
         conn.execute("DELETE FROM cash_control_his_entries WHERE batch_id = ?", (batch_id,))
         conn.execute(
-            "UPDATE cash_control_batches SET original_filename = ?, created_by = ?, created_at = CURRENT_TIMESTAMP WHERE id = ?",
-            (original_name, user["id"], batch_id),
+            "UPDATE cash_control_batches SET original_filename = ?, created_by = ?, created_at = ? WHERE id = ?",
+            (original_name, user["id"], vn_now_text(), batch_id),
         )
 
         for item in summaries.values():

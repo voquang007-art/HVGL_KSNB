@@ -246,7 +246,7 @@
 <div class="panel">
   <h3>Chữ ký số nội bộ</h3>
   <table class="table compact"><thead><tr><th>Người ký</th><th>Vai trò ký</th><th>Nội dung</th><th>Thời điểm</th></tr></thead><tbody>
-    {% for s in signatures %}<tr><td>{{ s.signer_name }}</td><td>{{ s.signer_role }}</td><td><pre>{{ s.signature_text }}</pre></td><td>{{ s.signed_at }}</td></tr>{% else %}<tr><td colspan="4" class="empty">Chưa có chữ ký.</td></tr>{% endfor %}
+    {% for s in signatures %}<tr><td>{{ s.signer_name }}</td><td>{{ s.signer_role }}</td><td><pre>{{ s.signature_text }}</pre></td><td>{{ s.signed_at_vn_text or s.signed_at }}</td></tr>{% else %}<tr><td colspan="4" class="empty">Chưa có chữ ký.</td></tr>{% endfor %}
   </tbody></table>
 </div>
 
@@ -316,7 +316,7 @@
 <div class="panel">
   <h3>Lịch sử luân chuyển</h3>
   <table class="table compact"><thead><tr><th>Thời điểm</th><th>Hành động</th><th>Từ</th><th>Đến</th><th>Ghi chú</th></tr></thead><tbody>
-    {% for r in routes %}<tr><td>{{ r.created_at }}</td><td>{{ r.action }}</td><td>{{ r.from_name }}</td><td>{{ r.to_name }}</td><td>{{ r.note }}</td></tr>{% else %}<tr><td colspan="5" class="empty">Chưa có luân chuyển.</td></tr>{% endfor %}
+     {% for r in routes %}<tr><td>{{ r.created_at_vn_text or r.created_at }}</td><td>{{ r.action }}</td><td>{{ r.from_name }}</td><td>{{ r.to_name }}</td><td>{{ r.note }}</td></tr>{% else %}<tr><td colspan="5" class="empty">Chưa có luân chuyển.</td></tr>{% endfor %}
   </tbody></table>
 </div>
 {% endblock %}

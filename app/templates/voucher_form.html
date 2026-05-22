@@ -34,7 +34,7 @@
       <div><label>Số tiền tổng</label><input name="total_amount" type="number" step="1" value="{{ voucher.total_amount if voucher else 0 }}"></div>
       <div><label>Đơn vị lập hồ sơ</label><input name="submitting_unit" value="{{ voucher.submitting_unit if voucher else '' }}"></div>
       <div><label>Người giao hồ sơ</label><input name="sender_name" value="{{ voucher.sender_name if voucher else '' }}"></div>
-      <div><label>Ngày tiếp nhận hồ sơ tại Ban Kiểm soát nội bộ</label><input name="received_at" type="datetime-local" value="{{ received_at_default or '' }}"></div>
+      <div><label>Ngày tiếp nhận hồ sơ tại Ban Kiểm soát nội bộ</label><input name="received_at" type="date" value="{{ received_at_default or '' }}"></div>
       <div>
         <label>Hình thức trình phê duyệt</label>
         <select name="approval_target">

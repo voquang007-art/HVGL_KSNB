@@ -77,31 +77,68 @@ ROMAN_NUMERALS = {
 VN_TZ = timezone(timedelta(hours=7))
 
 
+def parse_datetime_to_vn(value: str | None) -> datetime | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+
+    normalized_text = text.replace("T", " ")
+    if normalized_text.endswith("Z"):
+        normalized_text = normalized_text[:-1] + "+00:00"
+
+    try:
+        parsed = datetime.fromisoformat(normalized_text)
+    except ValueError:
+        for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d", "%d/%m/%Y %H:%M:%S", "%d/%m/%Y %H:%M", "%d/%m/%Y"):
+            try:
+                parsed = datetime.strptime(normalized_text, fmt)
+                break
+            except ValueError:
+                continue
+        else:
+            return None
+
+    if parsed.tzinfo is not None:
+        return parsed.astimezone(VN_TZ)
+
+    return parsed
+
+
+def vn_now_text() -> str:
+    return datetime.now(VN_TZ).replace(microsecond=0).isoformat()
+
+
 def vn_now_input_value() -> str:
-    return datetime.now(VN_TZ).strftime("%Y-%m-%dT%H:%M")
+    return datetime.now(VN_TZ).strftime("%Y-%m-%d")
+
+
+def date_input_value(value: str | None) -> str:
+    parsed = parse_datetime_to_vn(value)
+    if not parsed:
+        return ""
+    return parsed.strftime("%Y-%m-%d")
 
 
 def format_vn_datetime(value: str | None) -> str:
-    text = str(value or "").strip()
-    if not text:
-        return ""
-    try:
-        parsed = datetime.fromisoformat(text)
-        return parsed.strftime("%d/%m/%Y - %H:%M")
-    except ValueError:
-        return text
+    parsed = parse_datetime_to_vn(value)
+    if not parsed:
+        return str(value or "").strip()
+    return parsed.strftime("%d/%m/%Y")
+
+
+def format_vn_signature_datetime(value: str | None) -> str:
+    parsed = parse_datetime_to_vn(value)
+    if not parsed:
+        return str(value or "").strip()
+    return f"{parsed.hour:02d} giờ {parsed.minute:02d} phút, ngày {parsed.day:02d}/{parsed.month:02d}/{parsed.year:04d}"
 
 
 def format_vn_date_line(value: str | None) -> str:
-    text = str(value or "").strip()
-    if not text:
+    parsed = parse_datetime_to_vn(value)
+    if not parsed:
         now = datetime.now(VN_TZ)
         return f"Gia Lai, ngày {now.day:02d} tháng {now.month:02d} năm {now.year}"
-    try:
-        parsed = datetime.fromisoformat(text.replace(" ", "T"))
-        return f"Gia Lai, ngày {parsed.day:02d} tháng {parsed.month:02d} năm {parsed.year}"
-    except ValueError:
-        return "Gia Lai, ngày ...... tháng ...... năm ......"
+    return f"Gia Lai, ngày {parsed.day:02d} tháng {parsed.month:02d} năm {parsed.year}"
 
 
 def money_value(value) -> float:
@@ -440,11 +477,24 @@ def fetch_full_voucher(voucher_id: int) -> dict:
         payable_details_by_key: dict[str, list] = {}
         for item in payable_details:
             payable_details_by_key.setdefault(item["supplier_key"], []).append(item)
-        signatures = conn.execute("SELECT * FROM voucher_signatures WHERE voucher_id = ? ORDER BY id", (voucher_id,)).fetchall()
-        routes = conn.execute(
+        signature_rows = conn.execute("SELECT * FROM voucher_signatures WHERE voucher_id = ? ORDER BY id", (voucher_id,)).fetchall()
+        route_rows = conn.execute(
             "SELECT r.*, fu.full_name AS from_name, tu.full_name AS to_name FROM voucher_routes r LEFT JOIN users fu ON fu.id = r.from_user_id LEFT JOIN users tu ON tu.id = r.to_user_id WHERE r.voucher_id = ? ORDER BY r.id",
             (voucher_id,),
         ).fetchall()
+
+    signatures = []
+    for row in signature_rows:
+        item = dict(row)
+        item["signed_at_vn_text"] = format_vn_signature_datetime(item.get("signed_at"))
+        signatures.append(item)
+
+    routes = []
+    for row in route_rows:
+        item = dict(row)
+        item["created_at_vn_text"] = format_vn_signature_datetime(item.get("created_at"))
+        routes.append(item)
+
     return {
         "voucher": voucher,
         "docs": docs,
@@ -503,12 +553,13 @@ def mark_admin_voucher_seen(voucher_id: int, user: dict) -> None:
         if existing_seen:
             return
 
+        now_vn = vn_now_text()
         conn.execute(
             """
-            INSERT INTO voucher_routes(voucher_id, action, from_user_id, note)
-            VALUES (?, 'ADMIN_XEM_PHIEU', ?, ?)
+            INSERT INTO voucher_routes(voucher_id, action, from_user_id, note, created_at)
+            VALUES (?, 'ADMIN_XEM_PHIEU', ?, ?, ?)
             """,
-            (voucher_id, user["id"], "Admin đã mở xem Phiếu kiểm soát."),
+            (voucher_id, user["id"], "Admin đã mở xem Phiếu kiểm soát.", now_vn),
         )
         conn.commit()
 
@@ -554,6 +605,7 @@ def print_context(request: Request, voucher_id: int) -> dict:
         "ksnb_total": ksnb_total,
         "doc_payment_note": doc_payment_note,
         "format_vn_datetime": format_vn_datetime,
+        "format_vn_signature_datetime": format_vn_signature_datetime,
         "format_vn_date_line": format_vn_date_line,
         **data,
     }
@@ -740,17 +792,18 @@ async def voucher_create(
     # Lưu nháp cho phép chưa chọn nội dung kiểm soát trước ở Mục II.
 
     with get_conn() as conn:
+        now_vn = vn_now_text()
         cur = conn.execute(
             """
             INSERT INTO vouchers(title, hồ_so_type, total_amount, submitting_unit, sender_name, received_at,
                 approval_target, route_mode, status, section_iv_result, section_iv_note, section_v_text, section_vi_text,
-                created_by, current_handler)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'DRAFT', ?, ?, ?, ?, ?, ?)
+                created_by, current_handler, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'DRAFT', ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 title.strip(), ho_so_type, total_amount, submitting_unit.strip(), sender_name.strip(), received_at.strip(),
                 approval_target, route_mode, section_iv_result, section_iv_note, section_v_text, section_vi_text,
-                user["id"], head_user_id_value,
+                user["id"], head_user_id_value, now_vn,
             ),
         )
         voucher_id = cur.lastrowid
@@ -836,7 +889,7 @@ def voucher_edit(request: Request, voucher_id: int):
             "selected_review_items": selected_review_items,
             "heads": heads,
             "error": None,
-            "received_at_default": voucher["received_at"] or vn_now_input_value(),
+            "received_at_default": date_input_value(voucher["received_at"]) or vn_now_input_value(),
             "voucher": voucher,
             "is_edit": True,
             "form_action": f"/vouchers/{voucher_id}/edit",
@@ -1127,16 +1180,17 @@ def voucher_print(request: Request, voucher_id: int):
             ).fetchone()
 
             if current_voucher and current_voucher["status"] == "SUBMITTED_TO_BOARD":
+                now_vn = vn_now_text()
                 conn.execute(
                     "UPDATE vouchers SET status = 'BOARD_VIEWED', current_handler = NULL WHERE id = ?",
                     (voucher_id,),
                 )
                 conn.execute(
                     """
-                    INSERT INTO voucher_routes(voucher_id, action, from_user_id, note)
-                    VALUES (?, 'HDTV_XEM_PHIEU', ?, ?)
+                    INSERT INTO voucher_routes(voucher_id, action, from_user_id, note, created_at)
+                    VALUES (?, 'HDTV_XEM_PHIEU', ?, ?, ?)
                     """,
-                    (voucher_id, user["id"], "HĐTV đã mở xem Phiếu kiểm soát."),
+                    (voucher_id, user["id"], "HĐTV đã mở xem Phiếu kiểm soát.", now_vn),
                 )
                 conn.commit()
                 data = print_context(request, voucher_id)
@@ -1243,22 +1297,23 @@ def submit_voucher_no_signature(
         if not head_user:
             return RedirectResponse(f"/vouchers/{voucher_id}", status_code=303)
 
+        now_vn = vn_now_text()
         conn.execute("DELETE FROM voucher_signatures WHERE voucher_id = ?", (voucher_id,))
         conn.execute(
-            "INSERT INTO voucher_signatures(voucher_id, signer_id, signer_name, signer_role, signature_text, hash_value) VALUES (?, ?, ?, 'NGUOI_KIEM_SOAT', ?, NULL)",
-            (voucher_id, user["id"], user["full_name"], no_signature_text(user)),
+            "INSERT INTO voucher_signatures(voucher_id, signer_id, signer_name, signer_role, signature_text, hash_value, signed_at) VALUES (?, ?, ?, 'NGUOI_KIEM_SOAT', ?, NULL, ?)",
+            (voucher_id, user["id"], user["full_name"], no_signature_text(user), now_vn),
         )
         conn.execute(
-            "INSERT INTO voucher_signatures(voucher_id, signer_id, signer_name, signer_role, signature_text, hash_value) VALUES (?, ?, ?, 'TRUONG_BAN', ?, NULL)",
-            (voucher_id, head_user["id"], head_user["full_name"], no_signature_text(head_user)),
+            "INSERT INTO voucher_signatures(voucher_id, signer_id, signer_name, signer_role, signature_text, hash_value, signed_at) VALUES (?, ?, ?, 'TRUONG_BAN', ?, NULL, ?)",
+            (voucher_id, head_user["id"], head_user["full_name"], no_signature_text(head_user), now_vn),
         )
         conn.execute(
-            "UPDATE vouchers SET status = 'NO_SIGNATURE_INTERNAL', submitted_at = CURRENT_TIMESTAMP, submitted_to_board_at = NULL, current_handler = NULL WHERE id = ?",
-            (voucher_id,),
+            "UPDATE vouchers SET status = 'NO_SIGNATURE_INTERNAL', submitted_at = ?, submitted_to_board_at = NULL, current_handler = NULL WHERE id = ?",
+            (now_vn, voucher_id),
         )
         conn.execute(
-            "INSERT INTO voucher_routes(voucher_id, action, from_user_id, to_user_id, note) VALUES (?, 'KHONG_KY_SO_LUU_NOI_BO', ?, ?, ?)",
-            (voucher_id, user["id"], head_user["id"], "Không ký số; in tên người kiểm soát và Trưởng/Phó Trưởng ban KSNB trên Phiếu. Phiếu lưu nội bộ, không trình HĐTV."),
+            "INSERT INTO voucher_routes(voucher_id, action, from_user_id, to_user_id, note, created_at) VALUES (?, 'KHONG_KY_SO_LUU_NOI_BO', ?, ?, ?, ?)",
+            (voucher_id, user["id"], head_user["id"], "Không ký số; in tên người kiểm soát và Trưởng/Phó Trưởng ban KSNB trên Phiếu. Phiếu lưu nội bộ, không trình HĐTV.", now_vn),
         )
         conn.commit()
     return RedirectResponse(f"/vouchers/{voucher_id}", status_code=303)
@@ -1313,29 +1368,30 @@ def submit_voucher(
 
         if voucher["route_mode"] != "DIRECT_BOARD" and not voucher["current_handler"]:
             return RedirectResponse(f"/vouchers/{voucher_id}/edit", status_code=303)
+        now_vn = vn_now_text()
         conn.execute(
-            "INSERT INTO voucher_signatures(voucher_id, signer_id, signer_name, signer_role, signature_text, hash_value) VALUES (?, ?, ?, 'NGUOI_KIEM_SOAT', ?, ?)",
-            (voucher_id, user["id"], user["full_name"], signature_text(user), voucher_hash(voucher_id)),
+            "INSERT INTO voucher_signatures(voucher_id, signer_id, signer_name, signer_role, signature_text, hash_value, signed_at) VALUES (?, ?, ?, 'NGUOI_KIEM_SOAT', ?, ?, ?)",
+            (voucher_id, user["id"], user["full_name"], signature_text(user), voucher_hash(voucher_id), now_vn),
         )
         if voucher["route_mode"] == "DIRECT_BOARD":
             if user["role_code"] in HEAD_ROLES:
                 conn.execute(
-                    "INSERT INTO voucher_signatures(voucher_id, signer_id, signer_name, signer_role, signature_text, hash_value) VALUES (?, ?, ?, 'TRUONG_BAN', ?, ?)",
-                    (voucher_id, user["id"], user["full_name"], signature_text(user), voucher_hash(voucher_id)),
+                    "INSERT INTO voucher_signatures(voucher_id, signer_id, signer_name, signer_role, signature_text, hash_value, signed_at) VALUES (?, ?, ?, 'TRUONG_BAN', ?, ?, ?)",
+                    (voucher_id, user["id"], user["full_name"], signature_text(user), voucher_hash(voucher_id), now_vn),
                 )
             else:
                 conn.execute(
-                    "INSERT INTO voucher_signatures(voucher_id, signer_id, signer_name, signer_role, signature_text, hash_value) VALUES (?, NULL, 'Trưởng ban KSNB', 'TRUONG_BAN', ?, ?)",
-                    (voucher_id, HEAD_DELEGATION_TEXT, voucher_hash(voucher_id)),
+                    "INSERT INTO voucher_signatures(voucher_id, signer_id, signer_name, signer_role, signature_text, hash_value, signed_at) VALUES (?, NULL, 'Trưởng ban KSNB', 'TRUONG_BAN', ?, ?, ?)",
+                    (voucher_id, HEAD_DELEGATION_TEXT, voucher_hash(voucher_id), now_vn),
                 )
-            conn.execute("UPDATE vouchers SET status = 'SUBMITTED_TO_BOARD', submitted_at = CURRENT_TIMESTAMP, submitted_to_board_at = CURRENT_TIMESTAMP, current_handler = ? WHERE id = ?", (board_user["id"], voucher_id))
+            conn.execute("UPDATE vouchers SET status = 'SUBMITTED_TO_BOARD', submitted_at = ?, submitted_to_board_at = ?, current_handler = ? WHERE id = ?", (now_vn, now_vn, board_user["id"], voucher_id))
             conn.execute(
-                "INSERT INTO voucher_routes(voucher_id, action, from_user_id, to_user_id, note) VALUES (?, 'TRINH_THANG_HDTV', ?, ?, ?)",
-                (voucher_id, user["id"], board_user["id"], "Nhân viên ký số nội bộ và trình thẳng HĐTV"),
+                "INSERT INTO voucher_routes(voucher_id, action, from_user_id, to_user_id, note, created_at) VALUES (?, 'TRINH_THANG_HDTV', ?, ?, ?, ?)",
+                (voucher_id, user["id"], board_user["id"], "Nhân viên ký số nội bộ và trình thẳng HĐTV", now_vn),
             )
         else:
-            conn.execute("UPDATE vouchers SET status = 'SUBMITTED_TO_HEAD', submitted_at = CURRENT_TIMESTAMP WHERE id = ?", (voucher_id,))
-            conn.execute("INSERT INTO voucher_routes(voucher_id, action, from_user_id, to_user_id, note) VALUES (?, 'TRINH_TRUONG_BAN', ?, ?, ?)", (voucher_id, user["id"], voucher["current_handler"], "Nhân viên trình Trưởng ban KSNB"))
+            conn.execute("UPDATE vouchers SET status = 'SUBMITTED_TO_HEAD', submitted_at = ? WHERE id = ?", (now_vn, voucher_id))
+            conn.execute("INSERT INTO voucher_routes(voucher_id, action, from_user_id, to_user_id, note, created_at) VALUES (?, 'TRINH_TRUONG_BAN', ?, ?, ?, ?)", (voucher_id, user["id"], voucher["current_handler"], "Nhân viên trình Trưởng ban KSNB", now_vn))
         conn.commit()
     return RedirectResponse(f"/vouchers/{voucher_id}", status_code=303)
 
@@ -1379,21 +1435,23 @@ def head_approve(
         if not board_user:
             return RedirectResponse(f"/vouchers/{voucher_id}", status_code=303)
 
+        now_vn = vn_now_text()
         conn.execute(
-            "INSERT INTO voucher_signatures(voucher_id, signer_id, signer_name, signer_role, signature_text, hash_value) VALUES (?, ?, ?, 'TRUONG_BAN', ?, ?)",
-            (voucher_id, user["id"], user["full_name"], signature_text(user), voucher_hash(voucher_id)),
+            "INSERT INTO voucher_signatures(voucher_id, signer_id, signer_name, signer_role, signature_text, hash_value, signed_at) VALUES (?, ?, ?, 'TRUONG_BAN', ?, ?, ?)",
+            (voucher_id, user["id"], user["full_name"], signature_text(user), voucher_hash(voucher_id), now_vn),
         )
         conn.execute(
-            "UPDATE vouchers SET status = 'SUBMITTED_TO_BOARD', submitted_to_board_at = CURRENT_TIMESTAMP, current_handler = ? WHERE id = ?",
-            (board_user["id"], voucher_id),
+            "UPDATE vouchers SET status = 'SUBMITTED_TO_BOARD', submitted_to_board_at = ?, current_handler = ? WHERE id = ?",
+            (now_vn, board_user["id"], voucher_id),
         )
         conn.execute(
-            "INSERT INTO voucher_routes(voucher_id, action, from_user_id, to_user_id, note) VALUES (?, 'TRUONG_BAN_TRINH_HDTV', ?, ?, ?)",
+            "INSERT INTO voucher_routes(voucher_id, action, from_user_id, to_user_id, note, created_at) VALUES (?, 'TRUONG_BAN_TRINH_HDTV', ?, ?, ?, ?)",
             (
                 voucher_id,
                 user["id"],
                 board_user["id"],
                 "Trưởng ban/Phó Trưởng ban ký số nội bộ và trình Hội đồng thành viên.",
+                now_vn,
             ),
         )
         conn.commit()
@@ -1409,8 +1467,9 @@ def board_save(request: Request, voucher_id: int):
     if not can_board_view(user):
         return RedirectResponse(f"/vouchers/{voucher_id}", status_code=303)
     with get_conn() as conn:
-        conn.execute("UPDATE vouchers SET status = 'BOARD_SAVED', board_saved_at = CURRENT_TIMESTAMP WHERE id = ?", (voucher_id,))
-        conn.execute("INSERT INTO voucher_routes(voucher_id, action, from_user_id, note) VALUES (?, 'HDTV_LUU_PHIEU', ?, ?)", (voucher_id, user["id"], "HĐTV đã xem và lưu Phiếu"))
+        now_vn = vn_now_text()
+        conn.execute("UPDATE vouchers SET status = 'BOARD_SAVED', board_saved_at = ? WHERE id = ?", (now_vn, voucher_id))
+        conn.execute("INSERT INTO voucher_routes(voucher_id, action, from_user_id, note, created_at) VALUES (?, 'HDTV_LUU_PHIEU', ?, ?, ?)", (voucher_id, user["id"], "HĐTV đã xem và lưu Phiếu", now_vn))
         conn.commit()
     return RedirectResponse(f"/vouchers/{voucher_id}", status_code=303)
 
