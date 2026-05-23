@@ -510,17 +510,29 @@ def can_view_voucher(user: dict, voucher) -> bool:
     if not user or not voucher:
         return False
 
-    if user.get("role_code") == ROLE_ADMIN:
+    role_code = user.get("role_code")
+    user_id = user.get("id")
+
+    if role_code == ROLE_ADMIN:
         return True
 
-    if voucher["created_by"] == user.get("id"):
+    if voucher["created_by"] == user_id:
         return True
 
-    if user.get("role_code") in KSNB_ROLES:
+    if role_code == "TRUONG_BAN_KSNB":
         return True
 
-    if user.get("role_code") in BOARD_ROLES and voucher["status"] in ("SUBMITTED_TO_BOARD", "BOARD_VIEWED", "BOARD_SAVED"):
+    if role_code == "PHO_TRUONG_BAN_KSNB":
+        return voucher["current_handler"] == user_id
+
+    if role_code == "NHAN_VIEN_KSNB":
+        return False
+
+    if role_code == "TONG_GIAM_DOC" and voucher["status"] in ("SUBMITTED_TO_BOARD", "BOARD_VIEWED", "BOARD_SAVED"):
         return True
+
+    if role_code in BOARD_ROLES and voucher["status"] in ("SUBMITTED_TO_BOARD", "BOARD_VIEWED", "BOARD_SAVED"):
+        return voucher["current_handler"] == user_id
 
     return False
 
@@ -625,13 +637,22 @@ def voucher_list(request: Request):
     where_parts = ["1=1"]
     params: list = []
 
-    if user["role_code"] in KSNB_ROLES:
+    if user["role_code"] == "TRUONG_BAN_KSNB":
         where_parts.append(
             "(v.created_by = ? OR v.status IN ('SUBMITTED_TO_HEAD','HEAD_APPROVED','SUBMITTED_TO_BOARD','BOARD_VIEWED','BOARD_SAVED','NO_SIGNATURE_INTERNAL'))"
         )
         params.append(user["id"])
-    elif user["role_code"] in BOARD_ROLES:
+    elif user["role_code"] == "PHO_TRUONG_BAN_KSNB":
+        where_parts.append("(v.created_by = ? OR v.current_handler = ?)")
+        params.extend([user["id"], user["id"]])
+    elif user["role_code"] == "NHAN_VIEN_KSNB":
+        where_parts.append("v.created_by = ?")
+        params.append(user["id"])
+    elif user["role_code"] == "TONG_GIAM_DOC":
         where_parts.append("v.status IN ('SUBMITTED_TO_BOARD','BOARD_VIEWED','BOARD_SAVED')")
+    elif user["role_code"] in BOARD_ROLES:
+        where_parts.append("v.status IN ('SUBMITTED_TO_BOARD','BOARD_VIEWED','BOARD_SAVED') AND v.current_handler = ?")
+        params.append(user["id"])
     elif user["role_code"] != ROLE_ADMIN:
         where_parts.append("0=1")
 
@@ -695,9 +716,7 @@ def voucher_list(request: Request):
             item["is_new_for_current_user"] = True
         elif user["role_code"] in HEAD_ROLES and item["status"] == "SUBMITTED_TO_HEAD" and item["current_handler"] == user["id"]:
             item["is_new_for_current_user"] = True
-        elif user["role_code"] in BOARD_ROLES and item["status"] == "SUBMITTED_TO_BOARD" and (
-            item["current_handler"] == user["id"] or item["current_handler"] is None
-        ):
+        elif user["role_code"] in BOARD_ROLES and item["status"] == "SUBMITTED_TO_BOARD" and item["current_handler"] == user["id"]:
             item["is_new_for_current_user"] = True
 
         voucher_rows.append(item)
@@ -1172,17 +1191,17 @@ def voucher_print(request: Request, voucher_id: int):
     if user.get("role_code") == ROLE_ADMIN:
         mark_admin_voucher_seen(voucher_id, user)
 
-    if user.get("role_code") in BOARD_ROLES and voucher["status"] == "SUBMITTED_TO_BOARD":
+    if user.get("role_code") in BOARD_ROLES and user.get("role_code") != "TONG_GIAM_DOC" and voucher["status"] == "SUBMITTED_TO_BOARD":
         with get_conn() as conn:
             current_voucher = conn.execute(
-                "SELECT status FROM vouchers WHERE id = ?",
+                "SELECT status, current_handler FROM vouchers WHERE id = ?",
                 (voucher_id,),
             ).fetchone()
 
-            if current_voucher and current_voucher["status"] == "SUBMITTED_TO_BOARD":
+            if current_voucher and current_voucher["status"] == "SUBMITTED_TO_BOARD" and current_voucher["current_handler"] == user["id"]:
                 now_vn = vn_now_text()
                 conn.execute(
-                    "UPDATE vouchers SET status = 'BOARD_VIEWED', current_handler = NULL WHERE id = ?",
+                    "UPDATE vouchers SET status = 'BOARD_VIEWED' WHERE id = ?",
                     (voucher_id,),
                 )
                 conn.execute(
@@ -1421,6 +1440,8 @@ def head_approve(
         voucher = conn.execute("SELECT * FROM vouchers WHERE id = ?", (voucher_id,)).fetchone()
         if not voucher or voucher["status"] != "SUBMITTED_TO_HEAD":
             return RedirectResponse(f"/vouchers/{voucher_id}", status_code=303)
+        if user.get("role_code") != ROLE_ADMIN and voucher["current_handler"] != user["id"]:
+            return RedirectResponse(f"/vouchers/{voucher_id}", status_code=303)
 
         board_user = conn.execute(
             """
@@ -1458,16 +1479,24 @@ def head_approve(
     return RedirectResponse(f"/vouchers/{voucher_id}", status_code=303)
 
 
+
+
 @router.post("/{voucher_id}/board-save")
 def board_save(request: Request, voucher_id: int):
     denied = require_login(request)
     if denied:
         return denied
     user = request.state.user
-    if not can_board_view(user):
+    if not can_board_view(user) or user.get("role_code") == "TONG_GIAM_DOC":
         return RedirectResponse(f"/vouchers/{voucher_id}", status_code=303)
     with get_conn() as conn:
         now_vn = vn_now_text()
+        voucher = conn.execute("SELECT * FROM vouchers WHERE id = ?", (voucher_id,)).fetchone()
+        if not voucher or voucher["status"] not in {"SUBMITTED_TO_BOARD", "BOARD_VIEWED"}:
+            return RedirectResponse(f"/vouchers/{voucher_id}", status_code=303)
+        if user.get("role_code") != ROLE_ADMIN and voucher["current_handler"] != user["id"]:
+            return RedirectResponse(f"/vouchers/{voucher_id}", status_code=303)
+
         conn.execute("UPDATE vouchers SET status = 'BOARD_SAVED', board_saved_at = ? WHERE id = ?", (now_vn, voucher_id))
         conn.execute("INSERT INTO voucher_routes(voucher_id, action, from_user_id, note, created_at) VALUES (?, 'HDTV_LUU_PHIEU', ?, ?, ?)", (voucher_id, user["id"], "HĐTV đã xem và lưu Phiếu", now_vn))
         conn.commit()

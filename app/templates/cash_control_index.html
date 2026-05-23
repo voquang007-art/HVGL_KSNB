@@ -41,6 +41,25 @@
     font-weight: 700;
   }
 
+  .cash-date-combo {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 48px;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .cash-date-combo input[type="date"] {
+    width: 48px;
+    min-width: 48px;
+    padding: 8px 4px;
+    cursor: pointer;
+  }
+
+  .cash-date-combo input[type="date"]::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    margin: 0 auto;
+  }
+  
   .cash-btn-confirm-import {
     background: #d9f7e5 !important;
     color: #064e3b !important;
@@ -1464,14 +1483,27 @@
 
       <div>
         <label>Ngày/kỳ kiểm soát</label>
-        <input
-          type="text"
-          name="voucher_date"
-          value="{% if editing_cash_voucher %}{{ format_vn_control_date(editing_cash_voucher.voucher_date) }}{% endif %}"
-          placeholder="dd/mm/yyyy"
-          pattern="^(0?[1-9]|[12][0-9]|3[01])/(0?[1-9]|1[0-2])/[0-9]{4}$"
-          title="Nhập ngày theo định dạng dd/mm/yyyy, ví dụ 16/05/2026"
-        >
+        <div class="cash-date-combo">
+          <input
+            id="cashVoucherDateText"
+            type="text"
+            name="voucher_date"
+            value="{% if editing_cash_voucher %}{{ format_vn_control_date(editing_cash_voucher.voucher_date) }}{% endif %}"
+            placeholder="dd/mm/yyyy"
+            pattern="^(0?[1-9]|[12][0-9]|3[01])/(0?[1-9]|1[0-2])/[0-9]{4}$"
+            title="Nhập ngày theo định dạng dd/mm/yyyy, ví dụ 16/05/2026"
+            autocomplete="off"
+          >
+          <input
+            id="cashVoucherDatePicker"
+            type="date"
+            aria-label="Chọn Ngày/kỳ kiểm soát bằng lịch"
+            title="Chọn ngày từ lịch"
+          >
+        </div>
+        <div class="muted" style="margin-top:6px;">
+          Có thể nhập tay theo định dạng dd/mm/yyyy hoặc bấm ô lịch để chọn ngày.
+        </div>
       </div>
 
       <div>
@@ -1606,6 +1638,48 @@
 {% endif %}
 <script>
   document.addEventListener("DOMContentLoaded", function () {
+    const voucherDateText = document.getElementById("cashVoucherDateText");
+    const voucherDatePicker = document.getElementById("cashVoucherDatePicker");
+
+    function ddmmyyyyToIso(value) {
+      const text = String(value || "").trim();
+      const match = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+      if (!match) {
+        return "";
+      }
+
+      const day = match[1].padStart(2, "0");
+      const month = match[2].padStart(2, "0");
+      const year = match[3];
+
+      return `${year}-${month}-${day}`;
+    }
+
+    function isoToDdmmyyyy(value) {
+      const text = String(value || "").trim();
+      const match = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (!match) {
+        return "";
+      }
+
+      return `${match[3]}/${match[2]}/${match[1]}`;
+    }
+
+    if (voucherDateText && voucherDatePicker) {
+      voucherDatePicker.value = ddmmyyyyToIso(voucherDateText.value);
+
+      voucherDatePicker.addEventListener("change", function () {
+        const formattedDate = isoToDdmmyyyy(voucherDatePicker.value);
+        if (formattedDate) {
+          voucherDateText.value = formattedDate;
+        }
+      });
+
+      voucherDateText.addEventListener("input", function () {
+        voucherDatePicker.value = ddmmyyyyToIso(voucherDateText.value);
+      });
+    }
+  
     document.querySelectorAll(".cash-collapsible-panel > h3").forEach(function (heading) {
       const panel = heading.closest(".cash-collapsible-panel");
       if (!panel) {

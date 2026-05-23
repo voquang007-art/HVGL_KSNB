@@ -292,7 +292,7 @@
   </form>
   {% endif %}
 
-  {% if can_head and voucher.status == 'SUBMITTED_TO_HEAD' %}
+  {% if can_head and voucher.status == 'SUBMITTED_TO_HEAD' and (user.role_code == 'ADMIN' or voucher.current_handler == user.id) %}
   <form method="post" action="/vouchers/{{ voucher.id }}/head-approve" class="panel" style="margin-top:12px;">
     <h3>Trưởng ban/Phó Trưởng ban KSNB ký số và trình HĐTV</h3>
     <p class="muted">

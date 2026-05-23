@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from openpyxl import load_workbook
 
-from ..database import BOARD_ROLES, HEAD_ROLES, IMPORT_DIR, can_create_voucher, get_conn
+from ..database import BOARD_ROLES, HEAD_ROLES, IMPORT_DIR, KSNB_ROLES, ROLE_ADMIN, can_create_voucher, get_conn
 from ..excel_service import REVIEW_ITEM_MASTER
 from ..upload_security import (
     BUSINESS_IMPORT_EXTENSIONS,
@@ -240,6 +240,29 @@ def import_filter_choices(rows: list[Any]) -> dict[str, list[str]]:
 def require_login(request: Request):
     if not request.state.user:
         return RedirectResponse("/login", status_code=303)
+    return None
+
+
+def require_cash_control_access(request: Request):
+    denied = require_login(request)
+    if denied:
+        return denied
+
+    role_code = request.state.user.get("role_code")
+    if role_code not in (set(KSNB_ROLES) | set(BOARD_ROLES) | {ROLE_ADMIN}):
+        return RedirectResponse("/chat", status_code=303)
+
+    return None
+
+
+def require_cash_control_editor(request: Request, redirect_to: str = "/cash-control"):
+    denied = require_cash_control_access(request)
+    if denied:
+        return denied
+
+    if not can_create_voucher(request.state.user):
+        return RedirectResponse(redirect_to, status_code=303)
+
     return None
 
 
@@ -1563,24 +1586,40 @@ def fetch_full_cash_control_voucher(voucher_id: int) -> dict[str, Any]:
 
 
 def can_view_cash_control_voucher(user: dict, voucher: Any) -> bool:
-    if not voucher:
+    if not user or not voucher:
         return False
 
-    if user.get("role_code") == "ADMIN":
+    role_code = user.get("role_code")
+    user_id = user.get("id")
+
+    if role_code == ROLE_ADMIN:
         return True
 
-    if voucher["created_by"] == user.get("id"):
+    if voucher["created_by"] == user_id:
         return True
 
-    if user.get("role_code") in HEAD_ROLES:
+    if role_code == "TRUONG_BAN_KSNB":
         return True
 
-    if user.get("role_code") in BOARD_ROLES and voucher["status"] in {
+    if role_code == "PHO_TRUONG_BAN_KSNB":
+        return voucher["current_handler"] == user_id
+
+    if role_code == "NHAN_VIEN_KSNB":
+        return False
+
+    if role_code == "TONG_GIAM_DOC" and voucher["status"] in {
         "SUBMITTED_TO_BOARD",
         "BOARD_VIEWED",
         "BOARD_SAVED",
     }:
         return True
+
+    if role_code in BOARD_ROLES and voucher["status"] in {
+        "SUBMITTED_TO_BOARD",
+        "BOARD_VIEWED",
+        "BOARD_SAVED",
+    }:
+        return voucher["current_handler"] == user_id or voucher["board_user_id"] == user_id
 
     return False
 
@@ -2234,7 +2273,7 @@ def build_reconcile_context(
 
 @router.get("")
 def cash_control_index(request: Request):
-    denied = require_login(request)
+    denied = require_cash_control_access(request)
     if denied:
         return denied
 
@@ -2275,15 +2314,23 @@ def cash_control_index(request: Request):
         cash_voucher_where = ["1=1"]
         cash_voucher_params: list[Any] = []
 
-        if user.get("role_code") == "ADMIN":
+        if user.get("role_code") == ROLE_ADMIN:
             pass
-        elif user.get("role_code") in HEAD_ROLES:
+        elif user.get("role_code") == "TRUONG_BAN_KSNB":
             pass
-        elif user.get("role_code") in BOARD_ROLES:
-            cash_voucher_where.append("v.status IN ('SUBMITTED_TO_BOARD', 'BOARD_VIEWED', 'BOARD_SAVED')")
-        else:
+        elif user.get("role_code") == "PHO_TRUONG_BAN_KSNB":
+            cash_voucher_where.append("(v.created_by = ? OR v.current_handler = ?)")
+            cash_voucher_params.extend([user["id"], user["id"]])
+        elif user.get("role_code") == "NHAN_VIEN_KSNB":
             cash_voucher_where.append("v.created_by = ?")
             cash_voucher_params.append(user["id"])
+        elif user.get("role_code") == "TONG_GIAM_DOC":
+            cash_voucher_where.append("v.status IN ('SUBMITTED_TO_BOARD', 'BOARD_VIEWED', 'BOARD_SAVED')")
+        elif user.get("role_code") in BOARD_ROLES:
+            cash_voucher_where.append("v.status IN ('SUBMITTED_TO_BOARD', 'BOARD_VIEWED', 'BOARD_SAVED') AND (v.current_handler = ? OR v.board_user_id = ?)")
+            cash_voucher_params.extend([user["id"], user["id"]])
+        else:
+            cash_voucher_where.append("0=1")
 
         if selected_cash_voucher_year:
             cash_voucher_where.append("strftime('%Y', v.created_at) = ?")
@@ -2346,7 +2393,6 @@ def cash_control_index(request: Request):
         elif user["role_code"] in BOARD_ROLES and item["status"] == "SUBMITTED_TO_BOARD" and (
             item["current_handler"] == user["id"]
             or item["board_user_id"] == user["id"]
-            or item["current_handler"] is None
         ):
             item["is_new_for_current_user"] = True
 
@@ -2481,13 +2527,11 @@ async def cash_control_voucher_save(
     cashbook_batch_id: str = Form(""),
     accounting_batch_id: str = Form(""),
 ):
-    denied = require_login(request)
+    denied = require_cash_control_editor(request, "/cash-control?main_tab=voucher")
     if denied:
         return denied
 
     user = request.state.user
-    if not can_create_voucher(user):
-        return RedirectResponse("/cash-control?main_tab=voucher", status_code=303)
 
     head_id = int(head_user_id) if str(head_user_id or "").strip() else None
     his_id = int(his_batch_id) if str(his_batch_id or "").strip() else None
@@ -2520,7 +2564,7 @@ async def cash_control_voucher_basic_update(
     cashbook_batch_id: str = Form(""),
     accounting_batch_id: str = Form(""),
 ):
-    denied = require_login(request)
+    denied = require_cash_control_editor(request, f"/cash-control/vouchers/{voucher_id}")
     if denied:
         return denied
 
@@ -2562,7 +2606,7 @@ async def cash_control_voucher_basic_update(
 
 @router.get("/vouchers/{voucher_id}")
 def cash_control_voucher_detail(request: Request, voucher_id: int):
-    denied = require_login(request)
+    denied = require_cash_control_access(request)
     if denied:
         return denied
 
@@ -2588,7 +2632,7 @@ def cash_control_voucher_detail(request: Request, voucher_id: int):
 
 @router.get("/vouchers/{voucher_id}/print")
 def cash_control_voucher_print(request: Request, voucher_id: int):
-    denied = require_login(request)
+    denied = require_cash_control_access(request)
     if denied:
         return denied
 
@@ -2598,7 +2642,7 @@ def cash_control_voucher_print(request: Request, voucher_id: int):
     if not can_view_cash_control_voucher(user, voucher):
         return RedirectResponse("/cash-control?main_tab=voucher", status_code=303)
 
-    if user.get("role_code") in BOARD_ROLES and voucher["status"] == "SUBMITTED_TO_BOARD":
+    if user.get("role_code") in BOARD_ROLES and user.get("role_code") != "TONG_GIAM_DOC" and voucher["status"] == "SUBMITTED_TO_BOARD":
         with get_conn() as conn:
             current_voucher = conn.execute(
                 "SELECT status, current_handler, board_user_id FROM cash_control_vouchers WHERE id = ?",
@@ -2608,11 +2652,10 @@ def cash_control_voucher_print(request: Request, voucher_id: int):
             if current_voucher and current_voucher["status"] == "SUBMITTED_TO_BOARD" and (
                 current_voucher["current_handler"] == user["id"]
                 or current_voucher["board_user_id"] == user["id"]
-                or current_voucher["current_handler"] is None
             ):
                 now_vn = vn_now_text()
                 conn.execute(
-                    "UPDATE cash_control_vouchers SET status = 'BOARD_VIEWED', current_handler = NULL WHERE id = ?",
+                    "UPDATE cash_control_vouchers SET status = 'BOARD_VIEWED' WHERE id = ?",
                     (voucher_id,),
                 )
                 conn.execute(
@@ -2672,7 +2715,7 @@ def cash_control_voucher_print(request: Request, voucher_id: int):
 
 @router.post("/vouchers/{voucher_id}/delete")
 def cash_control_voucher_delete(request: Request, voucher_id: int):
-    denied = require_login(request)
+    denied = require_cash_control_editor(request, f"/cash-control/vouchers/{voucher_id}")
     if denied:
         return denied
 
@@ -2716,7 +2759,7 @@ def cash_control_voucher_delete(request: Request, voucher_id: int):
 
 @router.post("/vouchers/{voucher_id}/items/update")
 async def cash_control_voucher_items_update(request: Request, voucher_id: int):
-    denied = require_login(request)
+    denied = require_cash_control_editor(request, f"/cash-control/vouchers/{voucher_id}")
     if denied:
         return denied
 
@@ -2859,7 +2902,7 @@ def cash_control_voucher_submit_no_signature(
     voucher_id: int,
     no_sign_head_user_id: str = Form(...),
 ):
-    denied = require_login(request)
+    denied = require_cash_control_editor(request, f"/cash-control/vouchers/{voucher_id}")
     if denied:
         return denied
 
@@ -2960,7 +3003,7 @@ def cash_control_voucher_submit(
     voucher_id: int,
     board_user_id: str = Form(""),
 ):
-    denied = require_login(request)
+    denied = require_cash_control_editor(request, f"/cash-control/vouchers/{voucher_id}")
     if denied:
         return denied
 
@@ -3087,12 +3130,12 @@ def cash_control_voucher_head_approve(
     voucher_id: int,
     board_user_id: str = Form(...),
 ):
-    denied = require_login(request)
+    denied = require_cash_control_editor(request, f"/cash-control/vouchers/{voucher_id}")
     if denied:
         return denied
 
     user = request.state.user
-    if user.get("role_code") not in HEAD_ROLES and user.get("role_code") != "ADMIN":
+    if user.get("role_code") not in HEAD_ROLES and user.get("role_code") != ROLE_ADMIN:
         return RedirectResponse(f"/cash-control/vouchers/{voucher_id}", status_code=303)
 
     board_user_id_text = str(board_user_id or "").strip()
@@ -3108,6 +3151,8 @@ def cash_control_voucher_head_approve(
         now_vn = vn_now_text()
         voucher = conn.execute("SELECT * FROM cash_control_vouchers WHERE id = ?", (voucher_id,)).fetchone()
         if not voucher or voucher["status"] != "SUBMITTED_TO_HEAD":
+            return RedirectResponse(f"/cash-control/vouchers/{voucher_id}", status_code=303)
+        if user.get("role_code") != ROLE_ADMIN and voucher["current_handler"] != user["id"]:
             return RedirectResponse(f"/cash-control/vouchers/{voucher_id}", status_code=303)
 
         board_user = conn.execute(
@@ -3163,18 +3208,20 @@ def cash_control_voucher_head_approve(
 
 @router.post("/vouchers/{voucher_id}/board-save")
 def cash_control_voucher_board_save(request: Request, voucher_id: int):
-    denied = require_login(request)
+    denied = require_cash_control_access(request)
     if denied:
         return denied
 
     user = request.state.user
-    if user.get("role_code") not in BOARD_ROLES and user.get("role_code") != "ADMIN":
+    if (user.get("role_code") not in BOARD_ROLES and user.get("role_code") != ROLE_ADMIN) or user.get("role_code") == "TONG_GIAM_DOC":
         return RedirectResponse(f"/cash-control/vouchers/{voucher_id}", status_code=303)
 
     with get_conn() as conn:
         now_vn = vn_now_text()       
         voucher = conn.execute("SELECT * FROM cash_control_vouchers WHERE id = ?", (voucher_id,)).fetchone()
         if not voucher or voucher["status"] not in {"SUBMITTED_TO_BOARD", "BOARD_VIEWED"}:
+            return RedirectResponse(f"/cash-control/vouchers/{voucher_id}", status_code=303)
+        if user.get("role_code") != ROLE_ADMIN and not (voucher["current_handler"] == user["id"] or voucher["board_user_id"] == user["id"]):
             return RedirectResponse(f"/cash-control/vouchers/{voucher_id}", status_code=303)
 
         conn.execute(
@@ -3200,13 +3247,11 @@ def cash_control_voucher_board_save(request: Request, voucher_id: int):
 
 @router.post("/accounting/import/{batch_id}/replace")
 async def accounting_import_replace(request: Request, batch_id: int, accounting_file: UploadFile = File(...)):
-    denied = require_login(request)
+    denied = require_cash_control_editor(request, "/cash-control?main_tab=summary&summary_tab=accounting")
     if denied:
         return denied
 
     user = request.state.user
-    if not can_create_voucher(user):
-        return RedirectResponse("/cash-control?main_tab=summary&summary_tab=accounting", status_code=303)
 
     if not accounting_file.filename:
         return RedirectResponse("/cash-control?main_tab=summary&summary_tab=accounting", status_code=303)
@@ -3299,13 +3344,11 @@ async def accounting_import_replace(request: Request, batch_id: int, accounting_
 
 @router.post("/accounting/import")
 async def accounting_import(request: Request, accounting_file: UploadFile = File(...)):
-    denied = require_login(request)
+    denied = require_cash_control_editor(request, "/cash-control?main_tab=summary&summary_tab=accounting")
     if denied:
         return denied
 
     user = request.state.user
-    if not can_create_voucher(user):
-        return RedirectResponse("/cash-control?main_tab=summary&summary_tab=accounting", status_code=303)
 
     if not accounting_file.filename:
         return RedirectResponse("/cash-control?main_tab=summary&summary_tab=accounting", status_code=303)
@@ -3390,13 +3433,11 @@ async def accounting_import(request: Request, accounting_file: UploadFile = File
 
 @router.post("/cashbook/import/{batch_id}/replace")
 async def cashbook_import_replace(request: Request, batch_id: int, cashbook_file: UploadFile = File(...)):
-    denied = require_login(request)
+    denied = require_cash_control_editor(request, "/cash-control?main_tab=summary&summary_tab=cashbook")
     if denied:
         return denied
 
     user = request.state.user
-    if not can_create_voucher(user):
-        return RedirectResponse("/cash-control?main_tab=summary&summary_tab=cashbook", status_code=303)
 
     if not cashbook_file.filename:
         return RedirectResponse("/cash-control?main_tab=summary&summary_tab=cashbook", status_code=303)
@@ -3476,13 +3517,11 @@ async def cashbook_import_replace(request: Request, batch_id: int, cashbook_file
 
 @router.post("/cashbook/import")
 async def cashbook_import(request: Request, cashbook_file: UploadFile = File(...)):
-    denied = require_login(request)
+    denied = require_cash_control_editor(request, "/cash-control?main_tab=summary&summary_tab=cashbook")
     if denied:
         return denied
 
     user = request.state.user
-    if not can_create_voucher(user):
-        return RedirectResponse("/cash-control?main_tab=summary&summary_tab=cashbook", status_code=303)
 
     if not cashbook_file.filename:
         return RedirectResponse("/cash-control?main_tab=summary&summary_tab=cashbook", status_code=303)
@@ -3560,13 +3599,11 @@ async def cashbook_import(request: Request, cashbook_file: UploadFile = File(...
 
 @router.post("/import/{batch_id}/replace")
 async def cash_control_import_replace(request: Request, batch_id: int, revenue_file: UploadFile = File(...)):
-    denied = require_login(request)
+    denied = require_cash_control_editor(request, "/cash-control")
     if denied:
         return denied
 
     user = request.state.user
-    if not can_create_voucher(user):
-        return RedirectResponse("/cash-control", status_code=303)
 
     if not revenue_file.filename:
         return RedirectResponse("/cash-control", status_code=303)
@@ -3654,13 +3691,11 @@ async def cash_control_import_replace(request: Request, batch_id: int, revenue_f
 
 @router.post("/import")
 async def cash_control_import(request: Request, revenue_file: UploadFile = File(...)):
-    denied = require_login(request)
+    denied = require_cash_control_editor(request, "/cash-control")
     if denied:
         return denied
 
     user = request.state.user
-    if not can_create_voucher(user):
-        return RedirectResponse("/cash-control", status_code=303)
 
     if not revenue_file.filename:
         return RedirectResponse("/cash-control", status_code=303)
@@ -3746,7 +3781,7 @@ async def cash_control_import(request: Request, revenue_file: UploadFile = File(
 
 @router.get("/{batch_id}")
 def cash_control_detail(request: Request, batch_id: int):
-    denied = require_login(request)
+    denied = require_cash_control_access(request)
     if denied:
         return denied
 

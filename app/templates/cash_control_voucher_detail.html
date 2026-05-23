@@ -264,7 +264,7 @@
   </form>
   {% endif %}
 
-  {% if voucher.status == 'SUBMITTED_TO_HEAD' and user.role_code in ['ADMIN','TRUONG_BAN_KSNB','PHO_TRUONG_BAN_KSNB'] %}
+  {% if voucher.status == 'SUBMITTED_TO_HEAD' and (user.role_code == 'ADMIN' or voucher.current_handler == user.id) %}
   <form method="post" action="/cash-control/vouchers/{{ voucher.id }}/head-approve" class="panel" style="margin-top:12px;">
     <h3>Trưởng/Phó Ban KSNB ký số và trình HĐTV</h3>
     <p class="muted">
@@ -281,7 +281,7 @@
   </form>
   {% endif %}
 
-  {% if voucher.status in ['SUBMITTED_TO_BOARD','BOARD_VIEWED'] and user.role_code in ['ADMIN','TONG_GIAM_DOC','PHO_TONG_GIAM_DOC_THUONG_TRUC','PHO_TONG_GIAM_DOC'] %}
+  {% if voucher.status in ['SUBMITTED_TO_BOARD','BOARD_VIEWED'] and (user.role_code == 'ADMIN' or (user.role_code in ['PHO_TGD_THUONG_TRUC','PHO_TONG_GIAM_DOC'] and (voucher.current_handler == user.id or voucher.board_user_id == user.id))) %}
   <form method="post" action="/cash-control/vouchers/{{ voucher.id }}/board-save">
     <button class="primary cash-control-ui-font" type="submit">HĐTV xem và lưu Phiếu</button>
   </form>

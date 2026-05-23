@@ -108,10 +108,7 @@ def _voucher_badge_count(conn: sqlite3.Connection, user_id: int, role_code: str)
             SELECT COUNT(*) AS c
             FROM vouchers
             WHERE status = 'SUBMITTED_TO_BOARD'
-              AND (
-                  current_handler = ?
-                  OR current_handler IS NULL
-              )
+              AND current_handler = ?
             """,
             (user_id,),
         )
@@ -155,7 +152,6 @@ def _cash_control_badge_count(conn: sqlite3.Connection, user_id: int, role_code:
               AND (
                   current_handler = ?
                   OR board_user_id = ?
-                  OR current_handler IS NULL
               )
             """,
             (user_id, user_id),

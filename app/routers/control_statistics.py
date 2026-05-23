@@ -17,18 +17,17 @@ VN_TZ = timezone(timedelta(hours=7))
 ALLOWED_ROLES = set(KSNB_ROLES) | set(BOARD_ROLES) | {ROLE_ADMIN}
 
 IMPORTANT_VOUCHER_STATUSES = (
-    "SUBMITTED_TO_HEAD",
-    "HEAD_APPROVED",
     "SUBMITTED_TO_BOARD",
     "BOARD_VIEWED",
     "BOARD_SAVED",
+    "NO_SIGNATURE_INTERNAL",
 )
 
 CASH_CONTROL_VOUCHER_STATUSES = (
-    "SUBMITTED_TO_HEAD",
     "SUBMITTED_TO_BOARD",
     "BOARD_VIEWED",
     "BOARD_SAVED",
+    "NO_SIGNATURE_INTERNAL",
 )
 
 
@@ -124,12 +123,16 @@ def resolve_date_range(request: Request) -> tuple[date, date]:
 
 def date_filter_sql(alias: str) -> str:
     return (
-        "substr(COALESCE("
-        f"{alias}.board_saved_at, "
-        f"{alias}.submitted_to_board_at, "
-        f"{alias}.submitted_at, "
-        f"{alias}.created_at"
-        "), 1, 10) BETWEEN ? AND ?"
+        "substr(CASE "
+        f"WHEN {alias}.submitted_to_board_at IS NOT NULL "
+        f"AND TRIM({alias}.submitted_to_board_at) <> '' "
+        f"THEN {alias}.submitted_to_board_at "
+        f"WHEN {alias}.status IN ('SUBMITTED_TO_HEAD', 'HEAD_APPROVED', 'NO_SIGNATURE_INTERNAL') "
+        f"AND {alias}.submitted_at IS NOT NULL "
+        f"AND TRIM({alias}.submitted_at) <> '' "
+        f"THEN {alias}.submitted_at "
+        "ELSE NULL "
+        "END, 1, 10) BETWEEN ? AND ?"
     )
 
 
@@ -238,6 +241,7 @@ def build_report_text(start_date: date, end_date: date, stats: dict[str, Any]) -
             "",
             "BÁO CÁO THỐNG KÊ KIỂM SOÁT THU, CHI",
             f"Thời gian thống kê: từ {date_text_vn(start_date)} đến {date_text_vn(end_date)}",
+            "Phạm vi thống kê: toàn bộ số liệu do Ban KSNB đã thực hiện, gồm phiếu ký số đã trình HĐTV và phiếu không ký số lưu nội bộ.",
             "",
             "I. KIỂM SOÁT HỒ SƠ THU, CHI QUAN TRỌNG",
             "1. Hồ sơ đề nghị thanh toán",
