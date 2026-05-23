@@ -3369,14 +3369,15 @@ async def accounting_import(request: Request, accounting_file: UploadFile = File
         cur = conn.execute(
             """
             INSERT INTO cash_control_accounting_batches(
-                title, original_filename, created_by, accounting_non_cash_diff_total
+                title, original_filename, created_by, created_at, accounting_non_cash_diff_total
             )
-            VALUES (?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?)
             """,
             (
                 "Tổng hợp số báo cáo của Kế toán",
                 original_name,
                 user["id"],
+                vn_now_text(),
                 money_value(parsed.get("accounting_non_cash_diff_total")),
             ),
         )
@@ -3541,10 +3542,10 @@ async def cashbook_import(request: Request, cashbook_file: UploadFile = File(...
     with get_conn() as conn:
         cur = conn.execute(
             """
-            INSERT INTO cash_control_cashbook_batches(title, original_filename, created_by)
-            VALUES (?, ?, ?)
+            INSERT INTO cash_control_cashbook_batches(title, original_filename, created_by, created_at)
+            VALUES (?, ?, ?, ?)
             """,
-            ("Tổng hợp Sổ quỹ tiền mặt", original_name, user["id"]),
+            ("Tổng hợp Sổ quỹ tiền mặt", original_name, user["id"], vn_now_text()),
         )
         batch_id = cur.lastrowid
 
@@ -3713,10 +3714,10 @@ async def cash_control_import(request: Request, revenue_file: UploadFile = File(
     with get_conn() as conn:
         cur = conn.execute(
             """
-            INSERT INTO cash_control_batches(title, original_filename, report_date, created_by)
-            VALUES (?, ?, '', ?)
+            INSERT INTO cash_control_batches(title, original_filename, report_date, created_by, created_at)
+            VALUES (?, ?, '', ?, ?)
             """,
-            ("Kiểm soát thu chi tiền mặt", original_name, user["id"]),
+            ("Kiểm soát thu chi tiền mặt", original_name, user["id"], vn_now_text()),
         )
         batch_id = cur.lastrowid
 
