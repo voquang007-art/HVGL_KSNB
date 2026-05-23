@@ -1,7 +1,7 @@
 // HVGL KSNB service worker
 // Chỉ cache tài nguyên tĩnh an toàn. Không cache dữ liệu nghiệp vụ, API, phiếu, chat, họp, tài liệu upload.
 
-const HVGL_CACHE_NAME = "hvgl-ksnb-static-v1";
+const HVGL_CACHE_NAME = "hvgl-ksnb-static-v2";
 const HVGL_STATIC_ASSETS = [
   "/static/style.css",
   "/static/chat/chat.css",

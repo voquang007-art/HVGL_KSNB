@@ -8,6 +8,8 @@
   <meta name="theme-color" content="#0f766e">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="HVGL KSNB">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="mobile-web-app-capable" content="yes">
   <link rel="manifest" href="/static/manifest.webmanifest">
   <link rel="apple-touch-icon" href="/static/images/logo.png">
   <link rel="stylesheet" href="/static/style.css">
@@ -298,6 +300,39 @@
   <script>
     (function () {
       "use strict";
+      function supportsAppIconBadge() {
+        return "setAppBadge" in navigator && "clearAppBadge" in navigator;
+      }
+
+      function updateAppIconBadge(badgeData) {
+        if (!supportsAppIconBadge()) {
+          return;
+        }
+
+        var count = Number((badgeData && badgeData.count) || 0);
+
+        if (!count || count <= 0) {
+          navigator.clearAppBadge().catch(function () {
+            /* Không làm gián đoạn ứng dụng nếu trình duyệt không cho xóa badge icon. */
+          });
+          return;
+        }
+
+        navigator.setAppBadge(count).catch(function () {
+          /* Không làm gián đoạn ứng dụng nếu trình duyệt không cho đặt badge icon. */
+        });
+      }
+
+      function clearAppIconBadge() {
+        if (!supportsAppIconBadge()) {
+          return;
+        }
+
+        navigator.clearAppBadge().catch(function () {
+          /* Không làm gián đoạn ứng dụng nếu trình duyệt không cho xóa badge icon. */
+        });
+      }
+
 
       function updateBadge(key, badgeData) {
         var badges = document.querySelectorAll('[data-badge-key="' + key + '"]');
@@ -358,6 +393,8 @@
             navLink.removeAttribute("title");
           }
         });
+
+        clearAppIconBadge();
       }
 	  
       function updateRevenueControlBadge(badges) {
@@ -414,6 +451,7 @@
             updateBadge("chat", payload.badges.chat);
             updateBadge("meetings", payload.badges.meetings);
             updateBadge("draft_approvals", payload.badges.draft_approvals);
+            updateAppIconBadge(payload.badges.app_badge);
           })
           .catch(function () {
             clearBadges();

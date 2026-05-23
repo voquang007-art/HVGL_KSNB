@@ -321,6 +321,38 @@ def _draft_approval_badge_info(conn: sqlite3.Connection, user_id: int) -> dict[s
     }
 
 
+def _app_badge_info(
+    *,
+    voucher_count: int,
+    cash_control_count: int,
+    chat_badge: dict[str, Any],
+    meeting_badge: dict[str, Any],
+    draft_badge: dict[str, Any],
+) -> dict[str, Any]:
+    chat_count = int(chat_badge.get("count") or 0)
+    meeting_count = int(meeting_badge.get("count") or 0)
+    draft_count = int(draft_badge.get("count") or 0)
+    total_count = voucher_count + cash_control_count + chat_count + meeting_count + draft_count
+
+    title_parts: list[str] = []
+    if voucher_count > 0:
+        title_parts.append(f"{voucher_count} phiếu hồ sơ thu, chi quan trọng")
+    if cash_control_count > 0:
+        title_parts.append(f"{cash_control_count} phiếu thu, chi tiền mặt")
+    if chat_count > 0:
+        title_parts.append(f"{chat_count} thông báo trao đổi nội bộ")
+    if meeting_count > 0:
+        title_parts.append(f"{meeting_count} thông báo họp trực tuyến")
+    if draft_count > 0:
+        title_parts.append(f"{draft_count} văn bản dự thảo")
+
+    return {
+        "count": total_count,
+        "display": _badge_value(total_count),
+        "title": "Có việc chờ xử lý: " + "; ".join(title_parts) if title_parts else "",
+    }
+
+
 @router.get("")
 def nav_badges(request: Request):
     user = request.state.user
@@ -347,6 +379,14 @@ def nav_badges(request: Request):
         meeting_badge = _meeting_badge_info(conn, user_id)
         draft_badge = _draft_approval_badge_info(conn, user_id)
 
+    app_badge = _app_badge_info(
+        voucher_count=voucher_count,
+        cash_control_count=cash_control_count,
+        chat_badge=chat_badge,
+        meeting_badge=meeting_badge,
+        draft_badge=draft_badge,
+    )
+
     badges = {
         "vouchers": {
             "count": voucher_count,
@@ -361,6 +401,7 @@ def nav_badges(request: Request):
         "chat": chat_badge,
         "meetings": meeting_badge,
         "draft_approvals": draft_badge,
+        "app_badge": app_badge,
     }
 
     return JSONResponse(

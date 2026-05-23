@@ -2,9 +2,13 @@
   "name": "Cổng làm việc Ban Kiểm soát nội bộ",
   "short_name": "HVGL KSNB",
   "description": "Cổng làm việc nội bộ Ban Kiểm soát nội bộ Bệnh viện Hùng Vương Gia Lai",
+  "id": "/",
+  "lang": "vi-VN",
+  "dir": "ltr",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
+  "display_override": ["standalone", "browser"],
   "background_color": "#eef5fb",
   "theme_color": "#0f766e",
   "orientation": "any",
@@ -21,5 +25,6 @@
       "type": "image/png",
       "purpose": "any maskable"
     }
-  ]
+  ],
+  "prefer_related_applications": false
 }
