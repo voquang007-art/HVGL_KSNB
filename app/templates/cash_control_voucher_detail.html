@@ -6,6 +6,21 @@
     font-weight: 700;
   }
 
+  .preserve-user-text {
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .auto-resize-textarea {
+    width: 100%;
+    min-height: 44px;
+    overflow: hidden;
+    resize: vertical;
+    white-space: pre-wrap;
+    word-break: break-word;
+    line-height: 1.45;
+    box-sizing: border-box;
+  }
   .cash-btn-success {
     background: #16a34a !important;
     color: #ffffff !important;
@@ -104,7 +119,7 @@
     </select>
 
     <label>Ghi chú Mục IV</label>
-    <textarea name="section_iv_note">{{ voucher.section_iv_note or '' }}</textarea>
+    <textarea name="section_iv_note" class="preserve-user-text auto-resize-textarea">{{ voucher.section_iv_note or '' }}</textarea>
   </div>
 
   <div class="panel">
@@ -133,7 +148,7 @@
             <input type="hidden" name="checked_amount_{{ item.id }}" value="{{ item.ksnb_checked_amount or 0 }}">
           </td>
           <td class="{% if item.ksnb_check_type == 'DIFFERENT' %}warning-cell{% endif %}">
-            <input name="note_{{ item.id }}" value="{{ item.ksnb_note or '' }}" placeholder="Ghi chú chênh lệch">
+            <textarea name="note_{{ item.id }}" class="preserve-user-text auto-resize-textarea" placeholder="Ghi chú chênh lệch">{{ item.ksnb_note or '' }}</textarea>
           </td>
         </tr>
         {% endfor %}
@@ -168,7 +183,7 @@
             <input name="checked_amount_{{ item.id }}" value="{{ item.ksnb_checked_amount or '' }}" placeholder="Nếu Sai thì nhập số Ban KSNB xác định">
           </td>
           <td>
-            <input name="note_{{ item.id }}" value="{{ item.ksnb_note or '' }}" placeholder="Ghi chú nếu sai">
+            <textarea name="note_{{ item.id }}" class="preserve-user-text auto-resize-textarea" placeholder="Ghi chú nếu sai">{{ item.ksnb_note or '' }}</textarea>
           </td>
         </tr>
         {% endfor %}
@@ -183,10 +198,10 @@
 
     <div style="margin-top:12px;">
       <label>Kiến nghị của Ban Kiểm soát nội bộ</label>
-      <textarea name="section_v_text">{{ section_v_input_text }}</textarea>
+      <textarea name="section_v_text" class="preserve-user-text auto-resize-textarea">{{ section_v_input_text }}</textarea>
 
       <label>Ý kiến của đơn vị liên quan</label>
-      <textarea name="section_vi_text">{{ voucher.section_vi_text or '' }}</textarea>
+      <textarea name="section_vi_text" class="preserve-user-text auto-resize-textarea">{{ voucher.section_vi_text or '' }}</textarea>
     </div>
 
     {% if voucher.status == 'DRAFT' and (voucher.created_by == user.id or user.role_code == 'ADMIN') %}
@@ -315,4 +330,24 @@
     </tbody>
   </table>
 </div>
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    function autoResizeTextarea(textarea) {
+      if (!textarea) {
+        return;
+      }
+
+      textarea.style.height = "auto";
+      textarea.style.height = textarea.scrollHeight + "px";
+    }
+
+    document.querySelectorAll("textarea.auto-resize-textarea").forEach(function (textarea) {
+      autoResizeTextarea(textarea);
+
+      textarea.addEventListener("input", function () {
+        autoResizeTextarea(textarea);
+      });
+    });
+  });
+</script>
 {% endblock %}

@@ -217,11 +217,14 @@ def build_payable_warnings(imported_rows: list[dict], payable_rows: list[dict]) 
             item_by_key["payable_amount"] += payable_amount
 
     payment_by_match: dict[str, dict] = {}
+    missing_payable_by_key: dict[str, dict] = {}
 
     for row in imported_rows:
         supplier_code = str(row.get("supplier_code") or "").strip().upper()
         supplier_name = str(row.get("supplier") or "").strip()
         supplier_key = supplier_match_key(supplier_name)
+        source_type = str(row.get("source_type") or "").strip()
+        document_amount = money_value(row.get("document_amount"))
 
         match_key = ""
         payable = None
@@ -237,6 +240,20 @@ def build_payable_warnings(imported_rows: list[dict], payable_rows: list[dict]) 
             match_method = "Tên nhà cung cấp đã chuẩn hóa"
 
         if not match_key or not payable:
+            missing_key = supplier_code or supplier_key or supplier_name
+            missing_item = missing_payable_by_key.setdefault(
+                missing_key,
+                {
+                    "supplier_code": supplier_code,
+                    "supplier_name": supplier_name,
+                    "supplier_key": supplier_key,
+                    "source_types": set(),
+                    "control_payment_amount": 0.0,
+                },
+            )
+            missing_item["control_payment_amount"] += document_amount
+            if source_type:
+                missing_item["source_types"].add(source_type)
             continue
 
         item = payment_by_match.setdefault(
@@ -251,10 +268,35 @@ def build_payable_warnings(imported_rows: list[dict], payable_rows: list[dict]) 
                 "match_method": match_method,
             },
         )
-        item["control_payment_amount"] += money_value(row.get("document_amount"))
-        item["source_types"].add(str(row.get("source_type") or "").strip())
+        item["control_payment_amount"] += document_amount
+        if source_type:
+            item["source_types"].add(source_type)
 
     warnings: list[dict] = []
+
+    for missing_item in missing_payable_by_key.values():
+        control_amount = money_value(missing_item.get("control_payment_amount"))
+        if control_amount <= 0:
+            continue
+
+        warnings.append(
+            {
+                "supplier_name": missing_item["supplier_name"],
+                "supplier_key": missing_item["supplier_key"],
+                "source_types": ", ".join(sorted(x for x in missing_item["source_types"] if x)),
+                "control_payment_amount": control_amount,
+                "payable_amount": 0.0,
+                "over_amount": control_amount,
+                "warning_level": "MISSING_PAYABLE_SUPPLIER",
+                "warning_message": (
+                    "Số tiền thanh toán theo hồ sơ kiểm soát không có trong danh sách nhà cung cấp "
+                    "theo Sổ THCN. Phương thức đối chiếu: Mã và Tên nhà cung cấp đã chuẩn hóa. "
+                    "Người kiểm soát xem xét, kiểm tra nội dung thanh toán trước khi quyết định "
+                    "có đưa vào Phiếu kiểm soát hay không."
+                ),
+                "matched_payable_name": "",
+            }
+        )
 
     for payment in payment_by_match.values():
         payable = payment["payable"]

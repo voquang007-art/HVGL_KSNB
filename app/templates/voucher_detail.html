@@ -5,6 +5,22 @@
     font-family: inherit;
     font-weight: 700;
   }
+  
+  .preserve-user-text {
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .auto-resize-textarea {
+    width: 100%;
+    min-height: 44px;
+    overflow: hidden;
+    resize: vertical;
+    white-space: pre-wrap;
+    word-break: break-word;
+    line-height: 1.45;
+    box-sizing: border-box;
+  }  
 
   .voucher-warning-button {
     background: #fff3bf !important;
@@ -90,7 +106,7 @@
         <option value="Hồ sơ chưa đủ điều kiện trình phê duyệt." {% if voucher.section_iv_result == 'Hồ sơ chưa đủ điều kiện trình phê duyệt.' %}selected{% endif %}>Hồ sơ chưa đủ điều kiện trình phê duyệt.</option>
       </select>
       <label>Ghi chú Mục IV</label>
-      <textarea name="section_iv_note" placeholder="Nhập ghi chú kết quả kiểm soát trước nếu có">{{ voucher.section_iv_note or '' }}</textarea>
+      <textarea name="section_iv_note" class="preserve-user-text auto-resize-textarea" placeholder="Nhập ghi chú kết quả kiểm soát trước (Nếu có)">{{ voucher.section_iv_note or '' }}</textarea>
     </div>
 
     <table class="table compact">
@@ -128,7 +144,7 @@
           <td>
             <label class="inline-check"><input type="checkbox" name="payment_transfer_{{ d.id }}" value="1" {% if d.payment_transfer %}checked{% endif %}> Chuyển khoản</label>
             <label class="inline-check"><input type="checkbox" name="payment_cash_{{ d.id }}" value="1" {% if d.payment_cash %}checked{% endif %}> Tiền mặt</label>
-            <input name="note_{{ d.id }}" value="{{ d.ksnb_note or '' }}" placeholder="Ghi chú của nhân viên kiểm soát">
+            <textarea name="note_{{ d.id }}" class="preserve-user-text auto-resize-textarea" placeholder="Ghi chú của nhân viên kiểm soát">{{ d.ksnb_note or '' }}</textarea>
           </td>
         </tr>
       {% else %}
@@ -222,7 +238,7 @@
         <td class="num">{{ '{:,.0f}'.format(w.control_payment_amount or 0).replace(',', '.') }}</td>
         <td class="num">{{ '{:,.0f}'.format(w.payable_amount or 0).replace(',', '.') }}</td>
         <td class="num"><b>{{ '{:,.0f}'.format(w.over_amount or 0).replace(',', '.') }}</b></td>
-        <td>{{ w.warning_message }}</td>
+        <td class="preserve-user-text">{{ w.warning_message }}</td>
       </tr>
       {% else %}
       <tr>
@@ -236,7 +252,7 @@
 <div class="panel">
   {% for sec in optional_sections %}
   <h3>{{ sec.roman }}. {{ sec.title }}</h3>
-  <p>{{ sec.content }}</p>
+  <p class="preserve-user-text">{{ sec.content }}</p>
   {% endfor %}
 
   <h3>{{ conclusion_roman }}. Kết luận của Ban Kiểm soát nội bộ</h3>
@@ -319,4 +335,24 @@
      {% for r in routes %}<tr><td>{{ r.created_at_vn_text or r.created_at }}</td><td>{{ r.action }}</td><td>{{ r.from_name }}</td><td>{{ r.to_name }}</td><td>{{ r.note }}</td></tr>{% else %}<tr><td colspan="5" class="empty">Chưa có luân chuyển.</td></tr>{% endfor %}
   </tbody></table>
 </div>
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    function autoResizeTextarea(textarea) {
+      if (!textarea) {
+        return;
+      }
+
+      textarea.style.height = "auto";
+      textarea.style.height = textarea.scrollHeight + "px";
+    }
+
+    document.querySelectorAll("textarea.auto-resize-textarea").forEach(function (textarea) {
+      autoResizeTextarea(textarea);
+
+      textarea.addEventListener("input", function () {
+        autoResizeTextarea(textarea);
+      });
+    });
+  });
+</script>
 {% endblock %}

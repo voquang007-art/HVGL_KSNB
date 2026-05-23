@@ -76,7 +76,7 @@
     .stt { text-align:center; width:38px; }
     .total-row td { font-weight:bold; }
     .warning-cell { color:#b00000; font-weight:bold; }	
-    .text-box { white-space:pre-wrap; text-align:justify; }
+    .text-box { white-space:pre-wrap; text-align:justify; word-break:break-word; }
     .sign-grid { display:grid; grid-template-columns:1fr 1fr; gap:48px; margin-top:28px; }
     .sign-cell { text-align:center; min-height:120px; }
     .sign-title { font-weight:bold; text-transform:uppercase; }
@@ -177,7 +177,7 @@
           {{ '{:,.0f}'.format(d.ksnb_checked_amount or 0).replace(',', '.') }}
           {% endif %}
         </td>
-        <td class="note-col {% if d.ksnb_check_type in ['DIFFERENT', 'REJECTED'] %}warning-cell{% endif %}">
+        <td class="note-col text-box {% if d.ksnb_check_type in ['DIFFERENT', 'REJECTED'] %}warning-cell{% endif %}">
           {% if d.ksnb_check_type == 'REJECTED' %}Từ chối thanh toán{% endif %}
           {% if d.ksnb_check_type == 'REJECTED' and (d.payment_transfer or d.payment_cash or d.ksnb_note) %}; {% endif %}
           {% if d.payment_transfer %}Chuyển khoản{% endif %}
