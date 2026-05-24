@@ -40,6 +40,7 @@ from ..database import (
 )
 from ..security.deps import login_required
 from ..models import DocumentDraftActions, DocumentDraftFiles, DocumentDrafts, Users
+from ..path_security import ensure_safe_file_path
 from ..office_preview import (
     OfficePreviewError,
     ensure_office_pdf_preview,
@@ -1602,11 +1603,10 @@ def download_draft_file(
 
     draft = _ensure_draft_access(db, file_rec.draft_id, user)
 
-    if not os.path.isfile(file_rec.file_path or ""):
-        raise HTTPException(status_code=404, detail="Tệp không còn tồn tại trên máy chủ.")
+    safe_file_path = ensure_safe_file_path(file_rec.file_path or "")
 
     return FileResponse(
-        file_rec.file_path,
+        safe_file_path,
         media_type=_view_media_type(file_rec),
         filename=file_rec.file_name or "tep_dinh_kem",
     )
@@ -1637,12 +1637,11 @@ def preview_draft_file(
 
     draft = _ensure_draft_access(db, file_rec.draft_id, user)
 
-    if not os.path.isfile(file_rec.file_path or ""):
-        raise HTTPException(status_code=404, detail="Tệp không còn tồn tại trên máy chủ.")
+    safe_file_path = ensure_safe_file_path(file_rec.file_path or "")
 
     if _is_inline_viewable(file_rec):
         return FileResponse(
-            file_rec.file_path,
+            safe_file_path,
             media_type=_view_media_type(file_rec),
             filename=file_rec.file_name or "tep_dinh_kem",
             headers={
@@ -1653,7 +1652,7 @@ def preview_draft_file(
     if is_office_previewable(file_rec.file_name or ""):
         try:
             preview_path = _ensure_office_pdf_preview_auto(
-                source_path=file_rec.file_path,
+                source_path=safe_file_path,
                 preview_key=f"draft_{file_rec.id}",
                 original_name=file_rec.file_name or "tep_dinh_kem",
             )

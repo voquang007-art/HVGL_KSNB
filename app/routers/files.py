@@ -26,6 +26,7 @@ from ..upload_security import (
     save_upload_file_chunked,
 )
 from ..path_security import ensure_safe_file_path
+
 templates = Jinja2Templates(directory="app/templates")
 router = APIRouter()
 
@@ -347,6 +348,7 @@ def files_home(request: Request):
     )
 
 
+@router.post("/documents/upload")
 @router.post("/files/upload")
 async def upload_file(request: Request, upfile: UploadFile = File(...)):
     denied = require_login(request)
@@ -390,6 +392,7 @@ async def upload_file(request: Request, upfile: UploadFile = File(...)):
     return RedirectResponse("/documents?msg=Tải tệp lên thành công.", status_code=303)
 
 
+@router.get("/documents/view/{file_id}")
 @router.get("/files/view/{file_id}")
 def view_file(request: Request, file_id: int):
     denied = require_login(request)
@@ -414,6 +417,7 @@ def view_file(request: Request, file_id: int):
     )
 
 
+@router.get("/documents/download/{file_id}")
 @router.get("/files/download/{file_id}")
 def download_file(request: Request, file_id: int):
     denied = require_login(request)
@@ -438,6 +442,7 @@ def download_file(request: Request, file_id: int):
     )
 
 
+@router.post("/documents/delete/{file_id}")
 @router.post("/files/delete/{file_id}")
 def delete_file(request: Request, file_id: int):
     denied = require_login(request)
