@@ -1,13 +1,20 @@
 // HVGL KSNB service worker
 // Chỉ cache tài nguyên tĩnh an toàn. Không cache dữ liệu nghiệp vụ, API, phiếu, chat, họp, tài liệu upload.
 
-const HVGL_CACHE_NAME = "hvgl-ksnb-static-v2";
+const HVGL_CACHE_NAME = "hvgl-ksnb-static-v3";
 const HVGL_STATIC_ASSETS = [
   "/static/style.css",
   "/static/chat/chat.css",
   "/static/chat/chat.js",
   "/static/meetings/meeting.js",
   "/static/images/logo.png",
+  "/static/icons/icon-192.png",
+  "/static/icons/icon-512.png",
+  "/static/icons/maskable-192.png",
+  "/static/icons/maskable-512.png",
+  "/static/icons/apple-touch-icon-180.png",
+  "/static/icons/favicon-32.png",
+  "/static/icons/favicon-16.png",
   "/static/manifest.webmanifest"
 ];
 

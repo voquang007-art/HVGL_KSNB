@@ -44,6 +44,7 @@ from app.office_preview import (
     ensure_office_pdf_preview,
     is_office_previewable,
 )
+from app.path_security import ensure_safe_file_path
 
 from app.chat.service import (
     add_member_to_group,
@@ -176,13 +177,14 @@ def _stored_attachment_path_to_abs_path(path_value: str) -> str:
         return ""
 
     if os.path.isabs(clean):
-        return os.path.abspath(clean)
-
-    if clean.startswith("/static/"):
+        candidate = os.path.abspath(clean)
+    elif clean.startswith("/static/"):
         rel_path = clean.replace("/static/", "static/", 1).lstrip("/").replace("/", os.sep)
-        return os.path.abspath(os.path.join(settings.BASE_DIR, rel_path))
+        candidate = os.path.abspath(os.path.join(settings.BASE_DIR, rel_path))
+    else:
+        candidate = os.path.abspath(os.path.join(settings.ROOT_DIR, clean.lstrip("/\\").replace("/", os.sep)))
 
-    return os.path.abspath(os.path.join(settings.ROOT_DIR, clean.lstrip("/\\").replace("/", os.sep)))
+    return ensure_safe_file_path(candidate)
 
 
 def _chat_attachment_preview_url(attachment_id: str) -> str:

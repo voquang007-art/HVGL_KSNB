@@ -25,7 +25,7 @@ from ..upload_security import (
     UploadValidationError,
     save_upload_file_chunked,
 )
-
+from ..path_security import ensure_safe_file_path
 templates = Jinja2Templates(directory="app/templates")
 router = APIRouter()
 
@@ -347,7 +347,6 @@ def files_home(request: Request):
     )
 
 
-@router.post("/documents/upload")
 @router.post("/files/upload")
 async def upload_file(request: Request, upfile: UploadFile = File(...)):
     denied = require_login(request)
@@ -391,7 +390,6 @@ async def upload_file(request: Request, upfile: UploadFile = File(...)):
     return RedirectResponse("/documents?msg=Tải tệp lên thành công.", status_code=303)
 
 
-@router.get("/documents/view/{file_id}")
 @router.get("/files/view/{file_id}")
 def view_file(request: Request, file_id: int):
     denied = require_login(request)
@@ -406,9 +404,7 @@ def view_file(request: Request, file_id: int):
     if not rec:
         raise HTTPException(status_code=404, detail="Không tìm thấy tệp.")
 
-    path = rec.get("path") or ""
-    if not path or not os.path.exists(path):
-        raise HTTPException(status_code=404, detail="Không tìm thấy tệp trên máy chủ.")
+    path = ensure_safe_file_path(rec.get("path") or "")
 
     filename = rec.get("original_name") or os.path.basename(path)
     return FileResponse(
@@ -418,7 +414,6 @@ def view_file(request: Request, file_id: int):
     )
 
 
-@router.get("/documents/download/{file_id}")
 @router.get("/files/download/{file_id}")
 def download_file(request: Request, file_id: int):
     denied = require_login(request)
@@ -433,9 +428,7 @@ def download_file(request: Request, file_id: int):
     if not rec:
         raise HTTPException(status_code=404, detail="Không tìm thấy tệp.")
 
-    path = rec.get("path") or ""
-    if not path or not os.path.exists(path):
-        raise HTTPException(status_code=404, detail="Không tìm thấy tệp trên máy chủ.")
+    path = ensure_safe_file_path(rec.get("path") or "")
 
     filename = rec.get("original_name") or os.path.basename(path)
     return FileResponse(
@@ -445,7 +438,6 @@ def download_file(request: Request, file_id: int):
     )
 
 
-@router.post("/documents/delete/{file_id}")
 @router.post("/files/delete/{file_id}")
 def delete_file(request: Request, file_id: int):
     denied = require_login(request)

@@ -11,7 +11,9 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="mobile-web-app-capable" content="yes">
   <link rel="manifest" href="/static/manifest.webmanifest">
-  <link rel="apple-touch-icon" href="/static/images/logo.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/static/icons/apple-touch-icon-180.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/static/icons/favicon-16.png">
   <link rel="stylesheet" href="/static/style.css">
   <style>
     .company,
@@ -73,14 +75,33 @@
       display: none !important;
     }
 
-    .app-footer {
-      margin: 18px auto 10px auto;
-      padding: 10px 12px;
-      text-align: center;
-      color: #b77900;
-      font-style: italic;
+    .logout-form {
+      margin: 0 0 0 auto;
+      padding: 0;
+    }
+
+    .logout-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 9px 12px;
+      border: 0;
+      border-radius: 9px;
+      background: transparent;
+      color: #b42318;
+      font: inherit;
       font-weight: 700;
-      font-size: 14px;
+      cursor: pointer;
+    }
+
+    .logout-button:hover {
+      background: #fee2e2;
+    }
+
+    @media (max-width: 800px) {
+      .logout-form {
+        margin-left: 0;
+      }
     }
   </style>
 </head>
@@ -144,7 +165,9 @@
     </a>
     {% endif %}
 
-    <a class="logout" href="/logout">Đăng xuất</a>
+    <form class="logout-form" method="post" action="/logout">
+      <button class="logout-button" type="submit">Đăng xuất</button>
+    </form>
   </nav>
   {% endif %}
   <main class="container">
@@ -183,6 +206,17 @@
         var action = form.getAttribute("action") || window.location.href;
         if (!isSameOriginUrl(action)) {
           return;
+        }
+
+        var enctype = String(form.getAttribute("enctype") || "").toLowerCase();
+        if (enctype === "multipart/form-data") {
+          try {
+            var actionUrl = new URL(action, window.location.href);
+            actionUrl.searchParams.set("csrf_token", csrfToken);
+            form.setAttribute("action", actionUrl.pathname + actionUrl.search + actionUrl.hash);
+          } catch (err) {
+            /* Không làm gián đoạn form nếu trình duyệt không xử lý được URL. */
+          }
         }
 
         var input = form.querySelector('input[name="csrf_token"]');

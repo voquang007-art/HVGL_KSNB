@@ -71,6 +71,7 @@ from app.database import (
 )
 from app.models import Users
 from app.office_preview import OfficePreviewError, ensure_office_pdf_preview, is_office_previewable
+from app.path_security import ensure_safe_file_path
 from app.security.deps import login_required
 from app.upload_security import (
     GENERAL_SAFE_UPLOAD_EXTENSIONS,
@@ -573,13 +574,14 @@ def _stored_attachment_path_to_abs_path(path_value: str) -> str:
         return ""
 
     if os.path.isabs(clean):
-        return os.path.abspath(clean)
-
-    if clean.startswith("/static/"):
+        candidate = os.path.abspath(clean)
+    elif clean.startswith("/static/"):
         rel = clean.replace("/static/", "", 1).lstrip("/\\")
-        return os.path.abspath(os.path.join(settings.BASE_DIR, "static", rel.replace("/", os.sep)))
+        candidate = os.path.abspath(os.path.join(settings.BASE_DIR, "static", rel.replace("/", os.sep)))
+    else:
+        candidate = os.path.abspath(os.path.join(settings.ROOT_DIR, clean.lstrip("/\\").replace("/", os.sep)))
 
-    return os.path.abspath(os.path.join(settings.ROOT_DIR, clean.lstrip("/\\").replace("/", os.sep)))
+    return ensure_safe_file_path(candidate)
 
 
 def _attachment_media_type(attachment: ChatAttachments) -> str:

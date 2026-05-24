@@ -10,9 +10,10 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from .database import init_db, fetch_user, ROLE_LABELS, UNIT_LABELS
-from .routers import admin, auth, cash_control, chat, chat_api, control_statistics, draft_approval, files, future, meetings, nav_badges, revenue_control, vouchers
+from .routers import admin, auth, cash_control, chat, chat_api, control_statistics, draft_approval, files, meetings, nav_badges, revenue_control, vouchers
 
 HVGL_KSNB_ENV = os.environ.get("HVGL_KSNB_ENV", "development").strip().lower()
 HVGL_KSNB_PRODUCTION = HVGL_KSNB_ENV in {"production", "prod"}
@@ -23,15 +24,28 @@ if not SESSION_SECRET_KEY:
         raise RuntimeError("Thiếu biến môi trường HVGL_KSNB_SESSION_SECRET_KEY khi chạy production.")
     SESSION_SECRET_KEY = "DEV_ONLY_CHANGE_ME_HVGL_KSNB_SESSION_SECRET"
 
+SESSION_COOKIE_HTTPS_ONLY = os.environ.get(
+    "HVGL_KSNB_SESSION_HTTPS_ONLY",
+    "1" if HVGL_KSNB_PRODUCTION else "0",
+).strip().lower() in {"1", "true", "yes", "on"}
+
 CSRF_SESSION_KEY = "_csrf_token"
 CSRF_FORM_FIELD = "csrf_token"
 CSRF_HEADER_NAME = "x-csrf-token"
 CSRF_UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
-SESSION_COOKIE_HTTPS_ONLY = os.environ.get(
-    "HVGL_KSNB_SESSION_HTTPS_ONLY",
-    "1" if HVGL_KSNB_PRODUCTION else "0",
-).strip().lower() in {"1", "true", "yes", "on"}
+ALLOWED_HOSTS_RAW = os.environ.get(
+    "HVGL_KSNB_ALLOWED_HOSTS",
+    "ksnb.bvhvgl.com,localhost,127.0.0.1"
+    if HVGL_KSNB_PRODUCTION
+    else "localhost,127.0.0.1,0.0.0.0,*",
+).strip()
+
+ALLOWED_HOSTS = [
+    item.strip()
+    for item in ALLOWED_HOSTS_RAW.split(",")
+    if item.strip()
+]
 
 docs_url = None if HVGL_KSNB_PRODUCTION else "/docs"
 redoc_url = None if HVGL_KSNB_PRODUCTION else "/redoc"
@@ -43,6 +57,13 @@ app = FastAPI(
     redoc_url=redoc_url,
     openapi_url=openapi_url,
 )
+
+if ALLOWED_HOSTS:
+    app.add_middleware(
+        TrustedHostMiddleware,
+        allowed_hosts=ALLOWED_HOSTS,
+    )
+
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 
@@ -78,7 +99,15 @@ async def _extract_csrf_token_from_request(request: Request) -> str:
     if header_token:
         return header_token
 
+    query_token = request.query_params.get(CSRF_FORM_FIELD, "")
+    if query_token:
+        return query_token
+
     content_type = request.headers.get("content-type", "").lower()
+
+    if "multipart/form-data" in content_type:
+        return ""
+
     body = await request.body()
 
     async def receive():
@@ -94,12 +123,6 @@ async def _extract_csrf_token_from_request(request: Request) -> str:
         parsed = parse_qs(body.decode("utf-8", errors="ignore"))
         values = parsed.get(CSRF_FORM_FIELD) or []
         return str(values[0] if values else "")
-
-    if "multipart/form-data" in content_type:
-        pattern = rb'name=["\']csrf_token["\'][^\r\n]*\r\n(?:[^\r\n]*\r\n)*\r\n(.*?)\r\n'
-        match = re.search(pattern, body, flags=re.DOTALL)
-        if match:
-            return match.group(1).decode("utf-8", errors="ignore").strip()
 
     return ""
 
@@ -131,6 +154,19 @@ async def add_security_headers(request: Request, call_next):
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("Referrer-Policy", "same-origin")
     response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+    response.headers.setdefault(
+        "Content-Security-Policy",
+        "default-src 'self'; "
+        "img-src 'self' data: blob:; "
+        "style-src 'self' 'unsafe-inline'; "
+        "script-src 'self' 'unsafe-inline'; "
+        "font-src 'self' data:; "
+        "connect-src 'self' ws: wss:; "
+        "object-src 'none'; "
+        "base-uri 'self'; "
+        "frame-ancestors 'none'; "
+        "form-action 'self'"
+    )
     if HVGL_KSNB_PRODUCTION:
         response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
     return response
@@ -156,7 +192,7 @@ app.include_router(chat_api.router)
 app.include_router(draft_approval.router)
 app.include_router(meetings.router)
 app.include_router(nav_badges.router)
-app.include_router(future.router)
+
 
 @app.get("/")
 def home(request: Request):

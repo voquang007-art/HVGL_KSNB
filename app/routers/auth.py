@@ -82,11 +82,12 @@ def login(request: Request, username: str = Form(...), password: str = Form(...)
             )
 
         user = conn.execute(
-            "SELECT * FROM users WHERE username = ? AND is_active = 1",
+            "SELECT * FROM users WHERE username = ?",
             (clean_username,),
         ).fetchone()
 
-        login_success = bool(user and verify_password(password, user["password_hash"]))
+        password_ok = bool(user and verify_password(password, user["password_hash"]))
+        login_success = bool(password_ok and int(user["is_active"] or 0) == 1)
         _record_login_attempt(conn, clean_username, ip_address, login_success)
 
         if login_success and password_needs_rehash(user["password_hash"]):
@@ -98,6 +99,16 @@ def login(request: Request, username: str = Form(...), password: str = Form(...)
         conn.commit()
 
     if not login_success:
+        if user and password_ok and int(user["is_active"] or 0) != 1:
+            return templates.TemplateResponse(
+                "login.html",
+                {
+                    "request": request,
+                    "error": "Tài khoản đã đăng ký nhưng chưa được Quản trị hệ thống xét duyệt/kích hoạt.",
+                    "message": None,
+                },
+            )
+
         return templates.TemplateResponse(
             "login.html",
             {"request": request, "error": "Tên đăng nhập hoặc mật khẩu không đúng.", "message": None},
@@ -132,8 +143,8 @@ def register(
         with get_conn() as conn:
             cur = conn.execute(
                 """
-                INSERT INTO users(username, full_name, password_hash, unit_code, role_code, position_title)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO users(username, full_name, password_hash, unit_code, role_code, position_title, is_active)
+                VALUES (?, ?, ?, ?, ?, ?, 0)
                 """,
                 (
                     username,
@@ -147,10 +158,13 @@ def register(
             conn.commit()
     except Exception:
         return templates.TemplateResponse("register.html", {"request": request, "error": "Tên đăng nhập đã tồn tại hoặc dữ liệu không hợp lệ."})
-    return RedirectResponse(f"/login?msg={quote('Tài khoản đã được tạo. Vui lòng đăng nhập.')}", status_code=303)
+    return RedirectResponse(
+        f"/login?msg={quote('Tài khoản đã được tạo và đang chờ Quản trị hệ thống xét duyệt/kích hoạt.')}",
+        status_code=303,
+    )
 
 
-@router.get("/logout")
+@router.post("/logout")
 def logout(request: Request):
     request.session.clear()
     return RedirectResponse("/login", status_code=303)
